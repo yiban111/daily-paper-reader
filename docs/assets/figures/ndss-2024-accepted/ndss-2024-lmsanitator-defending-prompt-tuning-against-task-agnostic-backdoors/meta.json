@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/ndss-2024-accepted/ndss-2024-lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/fig-001.webp",
+      "caption": "",
+      "page": 18,
+      "index": 1,
+      "width": 800,
+      "height": 800
+    },
+    {
+      "url": "assets/figures/ndss-2024-accepted/ndss-2024-lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/fig-002.webp",
+      "caption": "",
+      "page": 18,
+      "index": 2,
+      "width": 800,
+      "height": 800
+    },
+    {
+      "url": "assets/figures/ndss-2024-accepted/ndss-2024-lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/fig-003.webp",
+      "caption": "",
+      "page": 18,
+      "index": 3,
+      "width": 800,
+      "height": 800
+    }
+  ]
+}

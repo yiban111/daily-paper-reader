@@ -1,0 +1,110 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-001.webp",
+      "caption": "",
+      "page": 1,
+      "index": 1,
+      "width": 507,
+      "height": 294
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-002.webp",
+      "caption": "",
+      "page": 1,
+      "index": 2,
+      "width": 2302,
+      "height": 1461
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-003.webp",
+      "caption": "",
+      "page": 5,
+      "index": 3,
+      "width": 792,
+      "height": 567
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-004.webp",
+      "caption": "",
+      "page": 5,
+      "index": 4,
+      "width": 2128,
+      "height": 982
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-005.webp",
+      "caption": "",
+      "page": 5,
+      "index": 5,
+      "width": 2925,
+      "height": 346
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-006.webp",
+      "caption": "",
+      "page": 5,
+      "index": 6,
+      "width": 792,
+      "height": 449
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-007.webp",
+      "caption": "",
+      "page": 5,
+      "index": 7,
+      "width": 3000,
+      "height": 1732
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-008.webp",
+      "caption": "",
+      "page": 8,
+      "index": 8,
+      "width": 2097,
+      "height": 1296
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-009.webp",
+      "caption": "",
+      "page": 8,
+      "index": 9,
+      "width": 1992,
+      "height": 1301
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-010.webp",
+      "caption": "",
+      "page": 8,
+      "index": 10,
+      "width": 1992,
+      "height": 1301
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-011.webp",
+      "caption": "",
+      "page": 8,
+      "index": 11,
+      "width": 2097,
+      "height": 1296
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-012.webp",
+      "caption": "",
+      "page": 13,
+      "index": 12,
+      "width": 1405,
+      "height": 618
+    },
+    {
+      "url": "assets/figures/acl-2026-findings/anthology-2026findings-acl896/fig-013.webp",
+      "caption": "",
+      "page": 13,
+      "index": 13,
+      "width": 1402,
+      "height": 696
+    }
+  ]
+}

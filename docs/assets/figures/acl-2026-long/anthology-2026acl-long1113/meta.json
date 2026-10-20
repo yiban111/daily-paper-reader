@@ -1,0 +1,86 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-001.webp",
+      "caption": "",
+      "page": 8,
+      "index": 1,
+      "width": 3263,
+      "height": 1955
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-002.webp",
+      "caption": "",
+      "page": 8,
+      "index": 2,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-003.webp",
+      "caption": "",
+      "page": 8,
+      "index": 3,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-004.webp",
+      "caption": "",
+      "page": 8,
+      "index": 4,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-005.webp",
+      "caption": "",
+      "page": 8,
+      "index": 5,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-006.webp",
+      "caption": "",
+      "page": 8,
+      "index": 6,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-007.webp",
+      "caption": "",
+      "page": 8,
+      "index": 7,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-008.webp",
+      "caption": "",
+      "page": 8,
+      "index": 8,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-009.webp",
+      "caption": "",
+      "page": 8,
+      "index": 9,
+      "width": 590,
+      "height": 490
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1113/fig-010.webp",
+      "caption": "",
+      "page": 15,
+      "index": 10,
+      "width": 737,
+      "height": 961
+    }
+  ]
+}

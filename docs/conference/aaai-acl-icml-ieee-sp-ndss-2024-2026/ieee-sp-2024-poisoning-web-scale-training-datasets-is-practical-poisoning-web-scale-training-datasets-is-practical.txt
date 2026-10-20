@@ -1,0 +1,562 @@
+Title: Poisoning Web-Scale Training Datasets is Practical
+
+URL Source: https://www.computer.org/csdl/pds/api/csdl/proceedings/download-article/1V5U7f5aGPu/pdf
+
+Published Time: Thu, 29 May 2025 23:06:35 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# Poisoning Web-Scale Training Datasets is Practical 
+
+Nicholas Carlini 1 Matthew Jagielski 1 Christopher A. Choquette-Choo 1 Daniel Paleka 2
+
+Will Pearce 3 Hyrum Anderson 4 Andreas Terzis 1 Kurt Thomas 5 Florian Tram` er 21Google DeepMind 2ETH Zurich 3NVIDIA 4Robust Intelligence 5Google                      
+
+> Abstract —Deep learning models are often trained on dis-tributed, web-scale datasets crawled from the internet. In this paper, we introduce two new dataset poisoning attacks
+> that intentionally introduce malicious examples to a model’s performance. Our attacks are immediately practical and could, today, poison 10 popular datasets. Our first attack, split-view poisoning , exploits the mutable nature of internet content to ensure a dataset annotator’s initial view of the dataset differs from the view downloaded by subsequent clients. By exploiting specific invalid trust assumptions, we show how we could have poisoned 0.01% of the LAION-400M or COYO-700M datasets for just $60 USD. Our second attack, frontrunning poisoning ,targets web-scale datasets that periodically snapshot crowd-sourced content—such as Wikipedia—where an attacker only needs a time-limited window to inject malicious examples. In light of both attacks, we notify the maintainers of each affected dataset and recommended several low-overhead defenses.
+
+## 1. Introduction 
+
+Datasets used to train deep learning models have grown from thousands of carefully-curated examples [24], [45], [59] to web-scale datasets with billions of samples crawled from the internet [14], [68], [77], [83]. At this scale, it is infeasible to manually curate and ensure the quality of each example. This quantity-over-quality tradeoff has so far been deemed acceptable, both because modern neural networks are extremely resilient to large amounts of label noise [79], [114], and because training on noisy data can even improve model utility on out-of-distribution data [74], [75]. While large deep learning models are resilient to ran-dom noise, even minuscule amounts of adversarial noise in training sets (i.e., a poisoning attack [11]) suffices to introduce targeted mistakes in model behavior [17], [18], [86], [104]. These prior works argued that poisoning attacks on modern deep learning models are practical due to the lack of human curation. Yet, despite the potential threat, to our knowledge no real-world attacks involving poisoning of web-scale datasets have occurred. One explanation is that prior research ignores the question of how an adversary would ensure that their corrupted data would be incorporated into a web-scale dataset. Indeed there is an exceptionally vast literature [1], [3], [7], [10], [11], [17], [18], [22], [31], [54], [62], [86], [99], [106], [113], [26], [30], [37], [55], [56], [71], [80], [88], [91], [94], [101], [102], [115] [9], [20], [28], [34], [38], [40], [53], [72], [89], [100], [109]–[111], [29], [57], [65], [66], [73], [81] that first presumes an adversary can modify a training dataset, and then asks (1) what impact this could have, (2) if poisoning can be stealthy, (3) how to defend against poisoning, and (4) how to attack these defenses. Our paper does not address any of these questions as there are already hundreds of papers already dedicated to each. We focus on the preliminary question: is it actually possible for an adversary to actually poison a dataset? This paper introduces two novel poisoning attacks that 
+
+guarantee malicious examples will appear in web-scale datasets used for training the largest machine learning models in production today. Our attacks exploit critical weaknesses in the current trust assumptions of web-scale datasets: due to a combination of monetary, privacy, and legal restrictions, many existing datasets are not published as static, standalone artifacts. Instead, datasets either consist of an index of web content that individual clients must crawl; or a periodic snapshot of web content that clients download. This allows an attacker to know with certainty what web content to poison (and even when to poison this content). Our two attacks work as follows:  
+
+> •
+
+Split-view data poisoning: Our first attack targets current large datasets (e.g., LAION-400M) and ex-ploits the fact that the data seen by the dataset curator at collection time might differ (significantly and arbitrarily) from the data seen by the end-user at training time. This attack is feasible due to a lack of (cryptographic) integrity protections: there is no guarantee that clients observe the same data when they crawl a page as when the dataset maintainer added it to the index.  
+
+> •
+
+Frontrunning data poisoning: Our second at-tack exploits popular datasets that consists of pe-riodical snapshots of user-generated content—e.g., Wikipedia snapshots. Here, if an attacker can pre-cisely time malicious modifications just prior to a snapshot for inclusion in a web-scale dataset, they can front-run the collection procedure. This attack is feasible due to predictable snapshot sched-ules, latency in content moderation, and snapshot immutability: even if a content moderator detects and reverts malicious modifications after-the-fact, the attacker’s malicious content will persist in the snapshot used for training deep learning models. 
+
+> 407
+
+2024 IEEE Symposium on Security and Privacy (SP) 
+
+> © 2024, Nicholas Carlini. Under license to IEEE. DOI 10.1109/SP54263.2024.00179
+> 2024 IEEE Symposium on Security and Privacy (SP) | 979-8-3503-3130-1/24/$31.00 ©2024 IEEE | DOI: 10.1109/SP54263.2024.00179
+
+We explore the feasibility of both of these attacks in practice on 10 popular web-scale datasets. We show these attacks are practical and realistic even for a low-resourced attacker: for just $60 USD, we could have poisoned 0.01% of the LAION-400M or COYO-700M datasets in 2023. To counteract these attacks, we propose two defenses:  
+
+> •
+
+Integrity verification prevents split-view poisoning by distributing cryptographic hashes for all content, thus ensuring that clients observe the same data as when maintainers first indexed and annotated it.  
+
+> •
+
+Timing-based defenses prevent frontrunning poi-soning by either randomizing the order in which data is snapshotted and placed into web-scale datasets; or delaying content prior to its inclusion into a snapshot and applying reversions from trusted moderators. We discuss limitations of these defenses (e.g., in the case of integrity checks, preventing benign modifications such as re-encoding, re-sizing, or cropping images) and more robust, future-looking solutions with fewer trust assumptions. 
+
+Responsible disclosure. We disclosed our results to the maintainers of each of the 10 datasets appearing in this study. Six of these datasets now follow our recommended implementation for integrity checks. We provided patches to the most popular web-scale dataset downloader to support integrity checks. Finally, we notified Wikipedia about the frontrunning vulnerability in their data collection process. 
+
+## 2. Background & Related Work 
+
+Our work builds on existing knowledge of the risk of poisoning large datasets, but focuses on the practical exploit vectors to launch such an attack. We outline why web-scale datasets have become of critical importance, known security risks of web-scale datasets, as well as auxiliary dataset quality issues that stem from ingesting uncurated data into models. 
+
+Towards uncurated datasets. Deep learning is most effec-tive when applied to large datasets [14], [42]. But curating such datasets is expensive, and the availability of training data has become a limiting factor for improving model utility. For example, the scaling laws observed in the recent Chinchilla [36] language model indicate that training a compute-optimal 500 billion parameter model would require 11 trillion tokens of training data—over 10 × more data than is currently used to train models of this size [23]. To drastically scale dataset sizes, it has become common to scrape data from a wider and wider range of untrusted and uncurated web sources. 
+
+Security risk of poisoning attacks. Uncurated training datasets are prime targets for poisoning attacks [11]. For example, an adversary could modify the training dataset (“poisoning” it) so that some targeted example will be mis-classified by models trained on this dataset. Early poisoning attacks targeted fully-supervised classifiers [22], [32], [88] trained on curated datasets. These attacks often aim to be “stealthy”, by altering data points in a manner indiscernible to human annotators [101]. Attacks on uncurated datasets do not require this strong property. On these datasets, poisoning rates as low as 0.001% have been shown effective [17], [18] at certain classes of poisoning attacks, e.g., targeted misclassification or planting model “backdoors” [22], [32]. It is thus known that if an adversary were somehow able to poison a fraction of a web-scale dataset, then they could cause significant harm. However, it is not well understood 
+
+how an adversary could place poisoned samples in any training dataset without guessing beforehand which parts of the web will be collected . This paper answers that question. 
+
+Auxiliary risks related to data quality. Spending time and effort to curate datasets has benefits besides security. Possi-bly most important among these is that uncurated data has serious implications for fairness, bias, and ethics [13], [74], [105]. For example, Birhane et al. [12] note that LAION-400M has “troublesome and explicit images and text pairs of rape, pornography, malign stereotypes, racist and ethnic slurs, and other extremely problematic content”. Language datasets also contain similarly harmful “hate speech and sexually explicit content, even after filtering” [58]. Dataset curation is not a perfect solution to these prob-lems. Birhane et al. [12] note, “without careful contex-tual analysis, filtering mechanisms are likely to censor and erase marginalized experiences”. Any filtering approach that selectively removes some data sources over others should carefully consider both the resulting security implications, as well as more general data quality metrics. 
+
+## 3. Threat Model & Attack Scenarios 
+
+Before presenting the implementation details of our at-tacks, we introduce key terminology, our threat model, and the high-level intuition behind our two attacks. 
+
+3.1. Terminology 
+
+Because it is infeasible to distribute web-scale datasets as standalone artifacts (due to the dataset size or regulatory concerns), current training datasets fall into two categories. In the first category, a maintainer generates a set of N
+
+tuples {(url i, c i)}Ni=1 consisting of a resource identifier url i
+
+and auxiliary data ci (typically a label). We let ti denote the time at which the i-th sample was originally collected. Critically, the maintainer does not provide a snapshot of the data associated with url i, due either to untenable storage costs [5], [6], [21], [43], privacy concerns [16], [98], or copyright limitations [19]. As such, we refer to these as 
+
+distributed datasets . One example is the LAION-5B dataset [83] which consists of five billion tuples of image URLs and corresponding text captions—corresponding to several hundred terabytes of data. In the second category of datasets, a curator produces a snapshot of a dataset {xi}Ni=1 , where each sample xi
+
+is drawn from a set of URLs {url i}Ni=1 at time ti, and then makes this snapshot publicly available. Because data 
+
+> 408
+
+served by these URLs changes over time, the curator will frequently (e.g., monthly) re-collect a dataset snapshot so that users have an up-to-date view of the data. We refer to these as centralized datasets . For example, both Wikipedia and Common Crawl regularly produce snapshots of their entire database. This simplifies access for people training large models, while also discouraging researchers from re-scraping the database directly. Once one of these two types of datasets is published, a 
+
+client (e.g., a researcher or applied practitioner) downloads a local copy of the training dataset D, either by crawling each URL for decentralized datasets {(url i, c i)}Ni=1 at a future time t′ 
+
+> i
+
+> t i, or by downloading the centralized dataset 
+
+{xi}Ni=1 . In practice, clients often use a downloader tool developed and maintained by a third party. 
+
+3.2. Threat Model 
+
+We assume the existence of a relatively unskilled, low-resource adversary who can tamper with the contents of a small number of URLs {url i}Ni=1 at some point in time ˆti,such that when a client or curator accesses resource i at a future time t′ 
+
+> i
+
+> ˆti, they receive a modified (poisoned) dataset D′ 6 = D. The difference between the poisoned and intended datasets must be sufficiently large such that a model f trained on D′ will produce poisoned results for some desired input. We let Sadv ⊂ { url i}Ni=1 denote the set of URLs an adversary can modify. We assume the adversary has no specialized or insider knowledge about the curator, downloader, or maintainer— other than knowledge of the set of URLs {url i}Ni=1 used to generate D (since this information is published by the dataset curator). We further assume all maintainers, curators and downloaders behave honestly and do not assist the adversary in any way. As such, the adversary has no control over the auxiliary data ci (e.g., supervised labels or text descriptions), nor can they add or remove any URLs from the training data that will be crawled by a client or curator. We make two critical (yet realistic) assumptions that enable our attacks. For distributed datasets, we assume that clients do not compare the cryptographic integrity of the local dataset copy D′ that they downloaded, with the original dataset D indexed by the maintainer. For centralized datasets, we assume that it takes the curator at least some time ∆ to detect malicious changes to the content hosted at any URL url i in the dataset (e.g., for Wikipedia, ∆ is the time it takes to revert a malicious edit). Thus, the curator cannot detect that url i hosts poisoned content if the attacker poisoned the content at any time ti − ∆ ≤ ˆti ≤ ti, where 
+
+ti is the time at which the content of url i is included in the dataset snapshot. As we will show, these assumptions holds true for nearly all modern web-scale datasets. We dis-cuss (in Section 6) how invalidating these assumptions—via cryptographic integrity checks and randomized crawling— can mitigate the attacks we describe. 
+
+3.3. Attack Scenarios 
+
+We propose two attack strategies for poisoning recent web-scale datasets. In the subsequent sections we demon-strate the efficacy of these attacks in practice on real-world datasets, and describe the ethical safeguards we followed to minimize harm. We focus our attacks on mechanisms that are unique to our study of dataset poisoning. Other potential security vulnerabilities (e.g., the ability of an adversary to interfere with unencrypted network requests, or to exploit website vulnerabilities to inject new content) are out of scope and would only improve our attack success rates. 
+
+Split-view poisoning. Our first attack exploits the fact that while the index of a distributed dataset published by a maintainer cannot be modified, the content of URLs in the dataset can. 1 This allows an adversary who can exert sustained control over a web resource to poison the resulting collected dataset collected by the end-user. The specific vulnerability we exploit in our attack results from a fairly simple observation: just because a web page hosted benign content when the dataset was initially col-lected, this does not mean the same page is currently hosting benign content. In particular, domain names occasionally expire—and when they do, anyone can buy them . We show that domain name expiration is exceptionally common in large datasets. The adversary does not need to know the exact time at which clients will download the resource in the future: by owning the domain the adversary guarantees that any future download will collect poisoned data. We note that attackers already routinely buy expired domains to hijack the residual trust attached with these domains [47], [52], [93]. Attackers have in the past targeted residual trust to defunct banking domains [61] and imported JavaScript libraries [67] to serve malware or steal user data, to take over email addresses associated with the domain [82], to control authoritative nameservers [52], or simply to serve ads [48]. Here, we abuse residual trust to poison distributed datasets. While more sophisticated attacks may accomplish the same goal—such as exploiting a website, coercing a website’s owner to modify content, or modify-ing unencrypted network traffic in flight—we focus on the natural phenomenon of domain expiration in this work. To select domains to purchase, the adversary can either prioritize cheap domains that host multiple URLs in the dataset (minimizing the cost per poisoned URL), or domains that host content with specific auxiliary data ci (recall that the adversary cannot modify the auxiliary data contained in the distributed dataset index). We show that split-view poisoning is effective in practice, as the index of most web-scale datasets remain unchanged long after their first publication, even after a significant fraction of the data goes stale. And critically, very few (and no modern) datasets include any form of cryptographic integrity check of the downloaded content.   
+
+> 1. Put differently, there is an important difference between the C types of “int const * ” (how practitioners often treat these URL-based datasets) and “ int * const ” (what the dataset actually provides).
+> 409
+
+Frontrunning poisoning. Our second attack extends the scope of split-view poisoning to the setting where an ad-versary does not have sustained control over web resources indexed by the dataset. Instead, the adversary can only modify web content for a short period (e.g., a few minutes) before the malicious edits are detected. This setting is common for datasets that aggregate con-tent published on crowdsourced web pages, e.g., Wikipedia. Indeed, it is easy to temporarily edit Wikipedia to vandalize its contents [87], [96]. A naive adversary might thus poison Wikipedia at arbitrary times and hope that a dataset curator will scrape the poisoned pages before the malicious edits are reverted. However, Wikipedia vandalism is reverted in a few minutes on average [108], so randomly-timed malicious edits are unlikely to affect dataset collection. Our frontrunning attack relies on the fact that an adver-sary can, in some cases, predict exactly when a web resource will be downloaded to the dataset. As a result, an adversary can poison the dataset contents just prior to the curator’s snapshot, thereby frontrunning moderators might later revert the malicious edits. We will show that frontrunning attacks are particularly effective for Wikipedia datasets, because the official Wikipedia snapshot procedure accesses articles in a predictable—and well documented [4]—linear sequence. An attacker can thus predict the snapshot time ti of any Wikipedia article down to the minute. 
+
+## 4. Split-View Data Poisoning 
+
+We begin our evaluation starting with split-view data poisoning attacks, where an attacker poisons a distributed dataset by purchasing and modifying expired domains. 
+
+4.1. Our Attack: Purchasing Expired Domains 
+
+While split-view poisoning is applicable to any dis-tributed dataset, we focus on multimodal image-text datasets. In such datasets, each URL points to an image hosted by some data provider, and the auxiliary data contains a textual description of the image, e.g., an annotated class label or a caption extracted from the web page. Our attack exploits the fact that the Domain Name System (DNS) does not assign permanent ownership of any domain to a particular person or organization, but rather grants short “leases” that must be frequently renewed. Thus, domain names continuously expire over time—intentionally or not—when the re-registration fees are not paid. When the domain that hosts an image in a distributed dataset expires, anyone can pay to take ownership over this domain and thereby gain the ability to return arbitrary con-tent when the indexed image is later downloaded by a victim client. Split-view poisoning abuses the residual trust inherent in an expired domain, as in traditional domain hijacking attacks [52]. We find that for many popular distributed datasets, domains are included with lax quality-assurance measures (if any), and thus domains with no special status that have been expired for months can freely be acquired to control a modest fraction of the entire dataset. In this section we study whether it is possible to poison datasets by purchasing expired domains. We first quantify the fraction of domains that are expired in popular dis-tributed datasets ( §4.2), then measure the frequency at which these datasets are scraped ( §4.3), verify our attack is not currently exploited in the wild ( §4.4) and study the attack’s potential down-stream impact ( §4.5). 
+
+4.2. Quantifying the Attack Surface 
+
+Table 1 lists ten recent datasets we study in this paper that are vulnerable to split-view poisoning. The three oldest datasets (PubFig, FaceScrub, and VGG Face) are datasets of faces and associate each image with the identity of a single person (most often a popular celebrity). The remaining seven datasets are multimodal datasets containing URLs that point to images, along with textual captions automatically extracted from the HTML of the webpage. As such, for these datasets, the image can be modified by the owner of the corresponding domain, but the image’s caption is fixed in the dataset index. To measure the fraction of images that could be po-tentially poisoned, we count the number of images hosted on domains that are expired and buyable . We say that a domain is expired if the DNS record for that domain does not exist. To measure this, we perform an nslookup on every domain name in the dataset from two geographically distinct data-centers in May 2022 and August 2022 and report the domain as expired if all four lookups result in a NXDOMAIN response. We further call a domain buyable if it is expired, and if at least one domain name registrar listed the domain as for sale by the registrar 2 in August 2022. Instead of counting the 
+
+total fraction of data that is buyable (which would represent a financially unconstrained adversary), Table 1 reports the fraction of images in the dataset from domains that can be purchased for a total cost of $1,000 USD. (Figure 1 plots the fraction of datasets that can be purchased as a function of total cost.) To compute this, we sort domains in decreasing order of the number of images the domain hosts divided by the cost to purchase this domain. Overall, we see that an adversary with a modest budget could purchase control over at least 0.02% –0.79% of the images for each of the 10 datasets we study. This is sufficient to launch existing poisoning attacks on uncurated datasets, which often require poisoning just 0.01% of the data [18]. 3
+
+There is also a direct relationship between the age of a dataset and how easy it is to poison. Older datasets are more likely to contain expired domains, and therefore an adversary can purchase a larger fraction of the dataset.    
+
+> 2. Some registrars list domains as for sale even if they are actually owned by a squatter. We exclude these domains from our set of buyable domains because purchasing these domains is often an expensive and lengthy process. 3. Carlini & Terzis [18] assume the adversary can modify images and
+> their captions, whereas our adversary only controls images. In §4.5, we show modifying captions is unnecessary for a successful poisoning attack.
+> 410
+
+TABLE 1: All recently-published large datasets are vulnerable to split-view poisoning attacks. 
+
+We have disclosed this vulnerability to the maintainers of affected datasets. All datasets have > 0.01% 
+
+of data purchaseable (in 2023), far exceeding the poisoning thresholds required in prior work [17]. Each of these datasets is regularly downloaded, with each download prior to our disclosure being vulnerable.                                                                                                                  
+
+> Size Release Cryptographic Data from Data buyable Downloads Dataset name (×10 6)date hash? expired domains for $1K USD per month
+> MMC4-FF [116] 375 2023 +70.14% ≥0.01% -Falcon RefinedWeb [70] 276 2023 +70.24% ≥0.02% -OBELISC [49] 353 2023 +70.09% ≥0.01% -LAION-2B-en [83] 2323 2022 7†0.29% ≥0.01% ≥7LAION-2B-multi [83] 2266 2022 7†0.55% ≥0.02% ≥4LAION-1B-nolang [83] 1272 2022 7†0.37% ≥0.02% ≥2COYO-700M [15] 747 2022 7‡1.51% ≥0.10% ≥5LAION-400M [84] 408 2021 70.71% ≥0.05% ≥10 Conceptual 12M [19] 12 2021 71.19% ≥0.12% ≥33 CC-3M [90] 3.32018 71.04% ≥0.08% ≥29 VGG Face [69] 2.62015 73.70% ≥0.17% ≥3FaceScrub [64] 0.10 2014 3§4.51% ≥0.61% ≥7PubFig [46] 0.06 2010 3§∗ 6.48% ≥0.32% ≥15
+> +These datasets were published after our paper was released, and even still they do not provide cryptographic hashes.
+> †LAION-5B released a “joined” dataset with hashes over the text of the URL and Caption (not the contents of the URL); this does not protect the integrity of the actual image.
+> ‡COYO-700M images are distributed with pHash [44] to validates benign image changes, but is not adversarially robust [41].
+> §FaceScrub and PubFig contain cryptographic hashes, but the dataset maintainers do not provide an official downloader client that verifies these. We find that nearly all third-party downloaders for these datasets ignore hashes.
+> ∗PubFig was initially released without hashes, but hashes were later added in Version 1.2 of the dataset.
+
+Datasets are vulnerable from day zero. A limitation of our above analysis is that we have measured the fraction of datasets vulnerable to poisoning in August 2022, but many of these datasets were constructed years earlier. It is therefore likely that many people who use these datasets would have already downloaded them at an earlier date, and thus may not have been vulnerable to our poisoning attack (although we will show in the following section that fresh downloads of these datasets remain frequent today). Fortunately, the COYO-700M dataset was released dur-ing the writing of this research paper, on 30 August 2022. On that same day, we computed the fraction of the dataset that was vulnerable to our poisoning attack and found that already 0.1% of the images were hosted on expired domains that cost fewer than $1,000 USD to purchase. The reason that the number of expired domains is not zero on release is that building these large datasets is a time-consuming and expensive procedure. And so even though the COYO-700M index was released in August 2022, it took nearly a year to collect the dataset [15], giving ample time for the earliest scraped domains to have expired before the dataset was released. 
+
+Measuring the attack cost. The most immediate question is if this attack can be realized in practice. The primary constraint in our attack is the monetary cost of purchasing domains. We measure this using the cost reported by Google Domains in July 2023. In Figure 1 we show the fraction of images in a dataset that can be controlled by the attacker as a function of their budget. At least 0.01% of each dataset can be controlled for less that $60 USD per year. 
+
+4.3. Measuring the Attack Impact 
+
+Our attacks are “retroactive” in the sense that we can poison a dataset after it has been initially constructed by the curators—but the impact is limited to those who download it after we take over the domains. And given that it has been several years since many of these datasets were initially con-structed, it is not obvious that anyone would still download them by scrapping URLs instead of reusing a previously downloaded version of the dataset. As a result, in order to measure the potential impact of a split-view poisoning attack it is necessary to study the rate at which these datasets are actually still being actively downloaded by researchers and practitioners today. 
+
+Methodology. We measure the rate at which each of these distributed datasets are downloaded from the internet by purchasing multiple expired domains from each of the 10 listed datasets and passively monitoring requests to measure the rate at which URLs corresponding to images from the distributed datasets are accessed. For each dataset, we purchase the three most popular expired and buyable domains (that is, the domains available for purchase that hosted the most images), and three ran-domly selected domains that were available for purchase. We wrote a simple server to log all incoming HTTP and HTTPS 4 requests, including the access time, a hash of the IP address, the full URL being requested, and any additional headers provided. This allowed us to count the frequency at 
+
+> 4. To also monitor HTTPS traffic we obtained certificates from LetsEn-crypt for each of our domains.
+> 411
+
+which these datasets are still downloaded. We ran this server for twelve months beginning in August 2022. 
+
+Analysis approach. Our server received approximately 15 
+
+million requests per month during our study, a rate of 6 requests every second. However from here it becomes nec-essary to separate the requests that were actually intending to download images from one of these datasets, from requests that come from other internet users or web crawlers. To begin our analysis, we make a (significant) simpli-fying assumption that anyone downloading one of these datasets does so from a single IP address. We may thus underestimate the true rate at which each dataset is down-loaded. We then say that a particular IP address X downloads a dataset D at time [T0, T 1] if we meet both a precision and recall requirement: 1) Recall: Within the time range [T0, T 1], the IP address X downloads at least 90% of the URLs contained in D under our control, including at least one URL from each of the 6 domains we own for that dataset. 2) Precision: At least 50% of the requests issued by X within this time range to the domains we control are to URLs in D.These conditions are conservative, but ensure we filter out web crawlers and other mass internet scrapers because these are likely to crawl other URLs from this domain (vio-lating the precision constraint) or not crawl the majority of the URLs from the dataset (violating the recall constraint). Because we own six domains per dataset it is exceptionally unlikely that, by random chance alone, one particular IP will request URLs from each of these six otherwise-unrelated domains. (In fact, we find that even checking 3 of these URLs would give almost identical precision.) As a point of reference, for the CC-3M dataset, we received 51,000 image requests per month from a total of 2401 unique IPs. By applying the precision constraint alone, we reduce this to 2007 unique IPs and 43,000 image requests; by applying the recall constraint alone we get 70 unique IPs and 32,000 image requests; and both together yields a further reduction of 64 unique IPs and 28,000 image requests (per month). 
+
+4.3.1. Results. We report our results in the rightmost col-umn of Table 1. Even the oldest and least frequently ac-cessed datasets still had at least 3 downloads per month. Thus, over the six months we tracked data, there were over 800 downloads that we could have poisoned with our attack. Unsurprisingly, we found that newer datasets are requested more often than older datasets. Different datasets thus offer different tradeoffs for attackers: newer datasets have a smaller fraction of purchasable images, but an attack can reach many more vulnerable clients. We observe that the largest billion-image datasets are downloaded significantly less often than smaller recent datasets. We found that the reason for this is that these datasets are rarely downloaded in their entirety; instead, they serve as an upstream source for smaller subsets. For $10 $100 $1k $10k Cost (USD) 0.01% 0.1% 1% Fraction of Images Controllable COYO-700M LAION-400M CC12M CC3M vggface facescrub pubfig 
+
+Figure 1: It often costs ≤ $60 USD to control at least 
+
+0.01% of the data . Costs are measured by purchasing domains in order of lowest cost per image first. example, the Public Multimodal Dataset (PMD) [92] and LAION-Aesthetics [85] datasets consist almost entirely of images drawn from LAION-2B-en. Sub-datasets like this explain why sometimes we see IP addresses with very high precision but low recall. 
+
+Visualizing dataset crawlers. Using our log files, we can visualize the ways in which dataset downloaders access these datasets by plotting URL requests as a function of time. We order the set of URLs we bought for each dataset according to their order in the original dataset index. In this way, crawlers that process the dataset index linearly should appear (roughly) as a linear line in our plot of URL requests over time. To improve clarity, we assign each unique IP that accesses our server a separate random color. Figure 2 gives this plot for the Conceptual 12M dataset. We find several trends in this data. First, most users who download this dataset do so in a linear order from the first to the last URL. However, the rate at which URLs are accessed is highly variable: some downloaders crawl the entire dataset in a few hours, while others take several weeks to download the same dataset. We also observe some users that batch the data into chunks and download each chunk in parallel, as well as users that pause their download momentarily and then resume a few hours later (on a different IP). While our strict precision and recall requirements al-ready give strong evidence that the IP addresses we logged were indeed downloading the dataset, the linear ordering of URL requests from these addresses all but confirms this. Indeed, because the ordering of URLs in the dataset index is random (instead of, say, alphabetical), a dataset download appears to be the only explanation for why the URLs would be linearly accessed in this particular order. 
+
+User-agent verification. The most popular user agent 5 is responsible for 77% of the traffic to our domains. This user agent is hardcoded 6 in img2dataset tool [8], the          
+
+> 5. Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0
+> 6. https://github.com/rom1504/img2dataset/blob/fc3fb2e/img2dataset/ downloader.py#L41
+> 412 2022-08-11 2022-08-13 2022-08-15 Date 02000 4000 6000 8000 Index of URL accessed
+
+Figure 2: Visualization of users downloading Conceptual 12M. By monitoring which URLs are requested from the domains we purchased, we plot every time a URL is re-quested over time, color coded by the source IP, and can directly read off several dozen users crawling Conceptual 12M. Figure 8 compares various filtering approaches. most popular dataset crawler. Given the claimed browser is Firefox 72–released in February 2020–it is highly likely that most of the requests indeed originate from img2dataset .
+
+Ethical considerations. We do not actually poison any datasets. For all URLs we own, we return a 404 Not Found response; so from the perspective of a dataset downloader our purchasing of the domain is completely transparent. We also place a robots.txt file to prevent typical web-scrapers from crawling our domains—this is unlikely to impact dataset downloads since dataset crawlers ignore this file. Finally, a request to the root domain returns a 403 Forbidden with a response body explaining that this domain is part of a research study. This response lists a contact email address and offers to return the domain to the original owner in case it was allowed to expire accidentally. We have not received any contact on this address. Appendix C contains the text of our landing page. Our data collection is minimally invasive. When search-ing for expired domains, we limit our DNS requests to 500/second, we only ask for the cost of purchasing the top-10,000 domains in each dataset, and only eventually purchase six. This research study was deemed “exempt” by our institution’s IRB. 
+
+4.4. Is This Attack Exploited in the Wild? 
+
+Given that this attack vector has existed for years against many datasets, and is easy to execute, it is not implausible that someone would have carried out such a poisoning attack in the past. Yet, we could not find any evidence of this. We search for a signature of a domain-purchasing at-tack by looking for domains that (1) host images that have been modified since the initial dataset release and (2) have changed ownership since the initial dataset release. To detect image changes, we can either check if images are perceptually similar to the originals (via, e.g., CLIP embeddings [76]) or exactly identical (via a cryptographic hash). Comparing images with cryptographic hashes has no false-negatives (i.e., any change is detected) but gives false-positives for “benign” changes, e.g., if a domain re-encodes or resizes its images. In contrast, a perceptual hash has fewer false-positives but can have false-negatives if an adversary buys a domain and modifies images while preserving the perceptual hash (which is not collision-resistant). Finally, to detect if a domain changed ownership, we request the 
+
+whois record and check the last purchase date. 
+
+Results. We perform our initial analysis on CC3M, a dataset where we have the original raw images as ground truth. Among all domains hosting more than 10 images, we find 
+
+just one domain has our attack signature when comparing images with perceptual similarity. Upon further investiga-tion, we find that this domain has been purchased by a domain squatter and any request to an image file on the domain returns an advertisement. If we instead compare cryptographic hashes of images, we find two additional domains that have been repurchased. However, further in-vestigation reveals the ownership of these domains has not changed and the DNS record simply lapsed, and images were re-encoded. We also conduct this same analysis on LAION-400M. Here we study three versions of the data: at original release (2021-11), and our own downloads at two later dates (2022-04 and 2022-08). We find no domain with such a signature in LAION-400M, and thus have no evidence at present that this attack would have been exploited against this dataset. Because we only have the original CLIP embeddings for this dataset (the original raw bytes were not saved), we only perform this comparison. We find that by the first and second snapshot respectively, there are 4.1M and 4.2Munique domains (of 5.6M) that host at least one modified image—in total, we found 175 M and 183 M modified im-ages, respectively. We measured this using a CLIP cosine similarity < 0.99 . We randomly sample a few thousand domains including the 700 with the most modified images. We find many cases where domains are still owned by the original owner, are currently for sale, or have been redacted, but none appear malicious. 
+
+4.5. Putting It All Together 
+
+Prior work [18] has successfully poisoned multimodal models contrastively trained on datasets of 3 million images, under the assumption the adversary can arbitrarily control the label of manipulated images. However, in this paper we study datasets over 100 × larger, and assume an adversary with no control over the text captions. Are poisoning attacks effective with these two changes? We find they are. We consider two poisoning attack objectives: (1) cause a particular image to be misclassified as some target label from ImageNet, and (2) cause a particular image to be classified as NSFW by the Stable Diffusion Safety Filter [78]. For each of these attack objectives, we first identify appropriate text captions in LAION 400M for which the corresponding image domains can be purchased 
+
+> 413
+
+for a total of $1,000 USD. Then, we locally replace these images with poisoned samples to simulate the effect of an attack, without any potential to cause harm to others. Specifically, we train one OpenCLIP [39] model using a ViT-B-32 architecture for 32 epochs, at a batch size of 3072 on 16 A100 GPUs. For our object-misclassification objective, we choose ten ImageNet classes that appeared in multiple text captions of images we can control. When we poison 1,000 images (0.00025% of the total dataset) our attack has a success rate of 60% in flipping the model’s zero-shot classification of the targeted image. For our NSFW objective, we find captions corresponding to images (from buyable domains) labeled as UNSAFE in the LAION 400M dataset index. Again at 1,000 poisoned samples, our attack has a success rate of above 90% . More details about this experiment are in Section B. 
+
+## 5. Frontrunning Poisoning 
+
+Our second attack removes the assumption that the adversary has sustained control over the web data in a training set. To do this we make a new assumption: that we can predict precisely when the web content will be downloaded. We will investigate this attack on Wikipedia-derived datasets, but also discuss how similar vulnerabilities may exist in the Common Crawl dataset in Appendix A. 
+
+5.1. Our Attack: Editing Wikipedia 
+
+Wikipedia is a crowdsourced encyclopedia. This makes it one of the most comprehensive and reliable datasets available on the internet [107]. As a result of its qual-ity and diversity, Wikipedia is frequently sourced for ML training data. Indeed, many language modelling datasets heavily rely on the English Wikipedia, e.g., it formed over 75% of the words in the BERT training set [25], 1.5% of the Pile dataset [27], and the entirety of the WikiText dataset [60]. Many task-specific datasets also rely on the En-glish Wikipedia: e.g., the WikiQA [112] question answering dataset (30,000+ downloads), and the WikiBio [51] biogra-phy writing dataset (19,000+ downloads). Finally, some of the distributed datasets discussed in Section 4 index many images from Wikipedia articles. Because Wikipedia is a live resource that anyone can edit, an attacker can poison a training set sourced from Wikipedia by making malicious edits. Deliberate malicious edits (or “vandalism”) are not uncommon on Wikipedia, but are often manually reverted within a few minutes [108]. As a result, actually poisoning Wikipedia appears challenging: unlike the attacks in our prior section, an adversary cannot exert sustained control of any particular page and would thus have to hope that their malicious edit is timed just perfectly to affect a dataset download before being reverted. However, we make one key observation that will guaran-tee the success of our poisoning attack: Wikipedia-derived datasets are not themselves live, but rather a collection of static snapshots. This is because Wikipedia forbids using web crawlers to scrape the live website. Instead, Wikipedia 
+
+Figure 3: An adversary can easily predict when any given Wikipedia article will be snapshot for inclusion in the bimonthly dump. We visualize edits around the June 1st, 2022 Wikipedia snapshot. Each point corresponds to an edit made to a Wikipedia article, with the article ID on the X axis and time (in seconds) that the edit was made on the Y axis. Edit points colored blue were included in the snapshot, and edits colored orange were not included. The “sawtooth” pattern exhibited in the plot indicates a trend where mul-tiple parallel jobs crawl Wikipedia articles sequentially to construct the snapshot. Furthermore, these parallel jobs run almost perfectly linearly through their allocated pages. makes available regular “dumps” (or snapshots) of the entire encyclopedia. Thus, training datasets sourced from Wikipedia use these snapshots instead of data crawled di-rectly from the site. For example, the authors of the BERT model [25] explicitly recommend “to download the latest [Wikipedia] dump” to reproduce their results. This makes it possible to mount what we call a fron-trunning attack . An attacker who can predict when aWikipedia page will be scraped for inclusion in the snapshot can perform poisoning immediately prior to scraping. Even if the edit is quickly reverted, the snapshot will contain the malicious content— forever . The attentive reader may argue we have not gained much: instead of having to predict the time at which Wikipedia is crawled by the end-user to produce a training set, the attacker has to predict the time at which Wikipedia is crawled to produce an official snapshot. But as we will see, the latter is actually easy. This section explores how an adversary can time mali-cious edits to guarantee successful poisoning of a Wikipedia snapshot. To this end, we need to answer two questions: 1) How accurately can we predict when a page will be scraped for inclusion in a Wikipedia snapshot? 2) How quickly do malicious edits get reverted? 
+
+5.2. Predicting Checkpoint Times 
+
+Wikipedia produces snapshots using a deterministic, well-documented protocol (with details that are easy to reverse through inspection). This makes it possible to predict snapshot times of individual articles with high accuracy. 
+
+> 414
+
+5.2.1. How Wikipedia Snapshots Work. English Wikipedia is archived on the 1st and 20th of each month. The snapshot is produced by n parallel workers; all Wikipedia articles are ordered sequentially by their ID and split into n chunks, and each worker independently and linearly scrapes all articles in their chunk. Due to Wikipedia’s size, the whole process takes nearly a day to complete. Different articles thus get scraped at significantly different wall-clock times. As a result an edit at time ti for one article may be excluded from the snapshot, while an edit at time tj > t i for a different article might be included. Figure 3 visualizes this “sawtooth” effect: there are many edits (in blue) that are included in the June 1st dump that were made before (i.e., below) a different edit that was not included (in orange). For a frontrunning attack to succeed, it is thus not sufficient to just predict the time at which the snapshot procedure begins. The attacker also needs to predict the precise time at which each individual page is scraped. 
+
+5.2.2. Exploiting Rolling Snapshots. To precisely predict each article’s scrape time, the attacker can exploit consis-tencies in Wikipedia’s snapshot process. First, the adversary knows precisely when each dump starts, because Wikimedia explicitly makes this information available by publishing live statistics on ongoing snapshots. 7
+
+Second, the rate at which articles are crawled in a dump remains consistent across dumps, and can thus be approximated from prior dumps (interestingly, crawls tend to speed up slightly over time). With these two pieces of information, the attacker can predict precisely when an article will be crawled. For an article i, we denote the time at which it is crawled for the current snapshot as ti and its crawl time in the previous snapshot as ti, prev . We denote the start time of the current and previous snapshots (as reported by Wikimedia) as t0 and 
+
+t0,prev respectively. Due to our first observation above, the attacker knows t0 and t0,prev . Due to our second observation, we have that ti − t0 ≈ ti, prev − t0,prev . This allows us to estimate the snapshot time of the i-th article as ti ≈ t0 +(ti, prev − t0,prev ). But calculating this requires knowledge of 
+
+ti, prev —the time at which the i-th article was crawled in the previous snapshot. We now discuss how to retroactively estimate this. 
+
+5.2.3. Determining the Article Snapshot Time. Wikipedia snapshots do not explicitly list the snapshot time for each article. But Wikipedia does give some auxiliary information: a complete list of edits with the precise time every edit is made. We show how this information can be used to retroactively estimate an article’s snapshot time. Recall from Figure 3 that for each article we can find the list of edits that were included in the current snapshot (blue points), with later edits appearing in the next snapshot (orange points). For each article, we thus know that the snapshot time ti was in-between the times of the article’s     
+
+> 7. On https://dumps.wikimedia.org/backup-index.html 4.0 4.1 4.2 4.3 4.4
+
+Article ID 1e7 2.700 2.705 2.710 2.715 2.720 2.725 
+
+> Edit Time (s)
+> 1e6
+
+Figure 4: We can obtain tight estimates on the time at which each article is snapshot. The green and orange lines show the interval [tlow 
+
+> i, prev
+
+, t high 
+
+> i, prev
+
+] for a range of articles from the English Wikipedia. On average, our predictions (blue line) are 27 minutes from the furthest interval boundary. last included edit (top-most blue point) and the first non-included edit (bottom-most orange point). But this interval is loose: the time between these edits is often several days. To refine our estimate of the snapshot time for each article, we can again exploit the consistency present in the Wikipedia crawling process. We observe that articles are processed sequentially: by zooming in to just a single crawling job as shown in Figure 3, we see that articles are crawled sequentially, and a clear line separates the last-included and first-not-included edits of each article. That is, for articles i and j processed in the same job, we have that ti < t j if i < j . We can thus tighten our interval around each article’s edit time by continually tracking the most recent edit made before the snapshot (for each article, this is the top-most blue edit made on an earlier article in that job), as well as the earliest edit among all subsequent articles in the job that was not included in the snapshot. We visualize this in Figure 4. For each article in the previous snapshot, we can thus obtain a time interval [tlow 
+
+> i, prev
+
+, t high 
+
+> i, prev
+
+]
+
+that contains the true (but unknown) snapshot time ti, prev . By our construction outlined above, we guarantee that the lower and upper limits of these intervals monotonically increase for all articles in a job (see Figure 4). To produce an estimate ˆti, prev for each article’s previous snapshot time, we compute a linear fit for the snapshot intervals of all articles processed by a single thread, as illustrated in Figure 4. This lets us predict the article’s next snapshot time as ˆti ≈ t0 + (ˆ ti, prev − t0,prev ).
+
+5.2.4. Evaluating our Predictions. We now evaluate our procedure for estimating article snapshot times. Ideally, we would directly compare our predicted snapshot times ˆti with the true snapshot time of the i-th article. But we do not know the ground truth, except up to some interval [tlow  
+
+> i
+
+, t high  
+
+> i
+
+]
+
+which we can compute a posteriori as described above. We thus proceed in two steps.     
+
+> 415 3000 2000 1000 01000
+> Prediction Error (s)
+> 0500 1000 1500 2000 2500 3000
+> Number of Pages
+
+Figure 5: Distribution of Wikipedia checkpoint time pre-diction errors. Most predicted checkpoint times are within 30 minutes of our constructed ground truth. In general, we predict edits too early, so it is important to later adjust for this bias, as we will discuss in Section 5.4. First, we show that our linear fit to estimate the previous snapshot time ˆti, prev is accurate. For this we measure the maximum absolute error between the predicted time ˆti, prev ,and the unknown ground truth in the interval [tlow 
+
+> i, prev
+
+, t high 
+
+> i, prev
+
+].This provides an upper bound on the true estimation error— bounded by 27 minutes on average. Second, we evaluate the accuracy of the extrapolation 
+
+of our predictions from one snapshot to the next. That is, we evaluate how close our a priori predicted snapshot time ˆti := t0 + (ˆ ti, prev − t0,prev ) is to the snapshot time that we could have estimated a posteriori using the linear fit described above. Figure 5 shows the distribution of the error estimates. Our predictions are correct to within roughly 30 minutes in most cases. We notice, however, that our extrapolation errors are biased towards negative. We find that this is because snapshots slightly speed up over time, so we typically overestimate the next snapshot time of an article. We will correct for this in Section 5.4, when we produce a conservative estimate of our attack’s success in poisoning Wikipedia snapshots. 
+
+5.3. Estimating Revision Speed 
+
+Now that we have measured how accurately we can predict when a future snapshot will happen, we turn to measuring the size of the opportunity window to make a malicious edit before it is reverted. Note that while the most accurate methodology would be to inject malicious edits and measure the distribution of reversion times, we believe this would be unethical. Instead, we take an entirely passive —albeit less accurate—approach as discussed in Section 5.6. To measure the speed of revisions, we construct a dataset of all edits made to Wikipedia from January 2021 to June 2022 (for a total of 18 months), and classify every edit as either an addition or as a reversion if they contain one of a 10 1 10 0 10 1 10 2 10 3 10 4
+
+> Time to Revert an Edit (min)
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> CDF of Reversion Time
+
+Figure 6: A CDF of revision times for English Wikipedia. Roughly 35% of revisions take more than 30 minutes. fixed set of strings 8 which are frequently used in reversion comments. We then conservatively assume that the edit being reverted was the immediately preceding edit, and so measure the reversion time as the elapsed interval between these two edits. 9 Figure 6 plots this distribution. When we combine the roughly 30 minutes of error in predicting future snapshot times (c.f. Figure 5), with another roughly 30 minutes for the average uncertainty in our estimate of the true snapshot time (c.f. Figure 4), we can conservatively estimate that the attacker can time their edit so as to be within one hour, on average, of the true snapshot time. Approximately 32% of reversions take more than an to be reverted and so the attack is likely to succeed often. In the next section, we refine this estimate to determine more precisely how many articles we could have poisoned. 
+
+5.4. Putting It All Together 
+
+Using our predictions of relative article snapshot times, our interval bound on the true snapshot time, and the distri-bution of reversion times, we can (conservatively) estimate the fraction of Wikipedia an adversary could have poisoned. There are two potential “failure cases” where a malicious edit may not make it into the dump:  
+
+> •
+
+the malicious edit is applied too late: the article was already snapshot, or  
+
+> •
+
+the malicious edit is applied too early: the edit gets reverted before the article is snapshot. This induces a tradeoff: the attacker should make edits early enough to ensure they do not miss the snapshot time, but late enough to maximize the chance of frontrunning editors. We therefore compute the optimal time to apply a ma-licious edit as follows. Recall that we use [tlow  
+
+> i
+
+, t high  
+
+> i
+
+] to 
+
+> 8. This set of strings is produced by manual analysis of a sample of comments from each Wikipedia; details are given in Appendix A.1. 9. This under-reports the edit time because if the vandalism was from an earlier edit, we would incorrectly use the later edit’s time instead.
+> 416
+
+represent the tightest interval around the true (but unknown) snapshot time ti of the i-th article, and ˆti is the predicted snapshot time. To balance the two failure modes above, and to account for the bias in our predictions (see Section 5.2.4), we introduce an “adjustment” variable a so that the adver-sary adds their malicious edits at time ˆti + a instead of exactly at time ˆti.Then the fraction of malicious Wikipedia edits that will make it into the snapshot, when they are made at time ˆti +a,can be lower-bounded as: 
+
+A(a) = 1
+
+|D|
+
+∑
+
+> i∈D
+
+(1 −
+
+> Edit applied too early
+
+︷ ︸︸ ︷
+
+prev (ˆ ti + a; thigh  
+
+> i
+
+)) ·(1 −1[ˆ ti + a > t low  
+
+> i
+
+]
+
+︸ ︷︷ ︸
+
+> Edit applied too late
+
+) ,
+
+where 1[ˆ ti + a > t low  
+
+> i
+
+] is the indicator function that is one if the edit is applied after the checkpoint (here we conser-vatively use our lower bound tlow  
+
+> i
+
+on the true checkpoint time), and prev (ˆ ti + a; thigh  
+
+> i
+
+) is the probability that the edit is reverted before the checkpoint (here we conservatively use the upper bound thigh  
+
+> i
+
+on the true checkpoint time). We compute this sum using our results from Section 5.2 and Section 5.3. By taking the maximum over a sweep of potential a values, we obtain max a A(a) = 0 .065 . Accord-ing to our conservative analysis, we can poison 6.5% of Wikipedia documents absent any other defensive measures. In reality, of course, a number of factors beyond our analysis would likely prevent us from reaching this fraction, such as rate limiting of edits or IP bans. We also “cheat” in choosing the optimal value of the adjustment value a, but we do not consider this a major limitation—an adversary could likely use more historical data to produce better estimates ˆti
+
+as well as good estimates of a. However, our analysis is also pessimistic since we assume we only try once to poison any given article. An adversary could attempt a more targeted attack where they retry edits on targeted articles, to force editors to revert multiple times and increase the likelihood of the edit making it into the dump. Ultimately, our best-effort estimate of 6.5% of poisoning success is orders-of-magnitude higher than what is required in prior poisoning attacks [18]. We thus argue that a successful frontrunning poisoning attack on Wikipedia snapshots is practical, and that finding ways to mitigate such attacks is a worthwhile research direction. 
+
+5.5. Multilingual Wikipedia 
+
+Wikipedia is also frequently used for non-English lan-guage modeling. For example, the multilingual version of BERT is trained entirely on the top 104 Wikipedia lan-guages. 10 . Multilingual datasets often rely more heavily on Wikipedia than English datasets. Thus, poisoning Wikipedia is even more harmful for non-English language modeling tasks. To measure this vulnerability, we investigate the Wiki-40B dataset [33] which is frequently used to train large multilingual models.                             
+
+> 10. See https://github.com/google-research/bert/blob/master/ multilingual.md#list-of-languages. da sl sk sr lv bg es et el no sv ro fr it ca lt vi uk hi he th ru hr tr id fa hu pt ja fi ar ms ko nl pl
+> Language id
+> 0.00 0.05 0.10 0.15 0.20 0.25
+> Poisoning Fraction
+
+Figure 7: Multilingual Wikipedia may be more vulnera-ble to frontrunning poisoning attacks. We compute poi-soning rates for 36 of the 40 languages languages contained in Wiki-40B [33] by reusing our attack from Sections 5.2 to 5.4. We repeat our analysis from the previous section on 35 of the 39 non-English languages contained in Wiki-40B by identifying which strings often represent a reversion in these languages. 11 Again our analysis here is loose: we identify only a subset of (often automated) reversions; however for the same reason as above we believe this represents a lower bound of the mean reversion time. We find that 22 (63%) of the non-English Wikipedias were easier to poison than the English Wikipedia, as shown in Figure 7. Feasible poisoning rates range from 0.95% to as much as 25.3%, with a median value of 8.2%. In general, the increase in vulnerability comes from multilin-gual Wikipedias having more predictable checkpoints, for two reasons. First, because these Wikipedias are smaller, the entire checkpointing procedure is shorter, reducing the amount of variance in checkpoint time between different pages. Second, because the Wikipedias change less be-tween successive checkpoints, the speed of checkpointing is more stable, improving our predictions. This may be why some of the larger Wikipedias, such as Spanish, Danish, and Italian, have comparable poisoning rates to English Wikipedia. However, our interval-based measurement is also more conservative for languages with slower edits, as the intervals will be larger, giving very small lower bounds for some small Wikipedias, such as Slovak and Slovenian. We reiterate that such large poisoning rates are unlikely to ever happen, due to IP bans or rate limiting. The most important takeaways from our analysis here are that 1) multilingual Wikipedias are vulnerable to poisoning, and often more vulnerable than English Wikipedia, and 2) multi-lingual datasets tend to rely more on Wikipedia than English datasets do, compounding this risk. 
+
+5.6. Ethical Considerations 
+
+Our actions here are entirely passive. We make no edits to Wikipedia and, aside from downloading datasets from the official sources, never interact with Wikipedia. While this leads to limitations in our analysis, we believe this is the correct way to run such a study to avoid harming the Wikipedia editor community. We disclosed our attack 
+
+> 11. We were unable to access the German, Chinese, and Czech check-points for the checkpoint times we studied, and Tagalog did not have enough data to reliably analyze.
+> 417
+
+analysis (and later defense recommendations) to researchers at Wikimedia who acknowledged the vulnerability before release of this paper. 
+
+## 6. Defenses 
+
+In order to address the attacks that we identified, we propose an integrity-based defense for split-view poisoning and a timing-based defense for frontrunning poisoning. We also discuss potential directions to address poisoning more generally. We shared these defenses with curators, maintain-ers, and downloaders as part of our responsible disclosure and report on the status of their implementation of defenses. 
+
+6.1. Existing Trust Assumptions 
+
+Per our threat model (Section 3), our proposed defenses assume that all maintainers, curators, and downloaders are trusted and behave honestly. This means that maintainers provide the same distributed dataset index {(url i, c i)}Ni=1 to any client and that the index itself has not been poisoned (e.g., due to insider risk or compromise). Downloaders for distributed datasets honestly access each url i and compute integrity checks added via our defenses. Curators provide the same centralized dataset D to all clients, with curators controlling the time ti at which any element url i is snapshot. These assumptions mirror the existing trust that clients place in maintainers, curators, and downloaders and thus represent the quickest, short-term path to enacting defenses. We discuss limitations of these trust assumptions (and robust solutions with fewer trust assumptions) in Section 6.5. 
+
+6.2. Preventing Split-View Poisoning 
+
+While the simplest defense to split-view poison-ings attack would be to convert the distributed dataset 
+
+{(url i, c i)}Ni=1 into a centralized dataset (e.g., as in YFCC100M [97]), this is presently unrealistic due to the monetary, privacy, and legal challenges laid out in Section 3. Instead, maintainers—or another trusted third-party—can prevent split-view attacks by attaching a cryptographic hash 
+
+hi = H(xi) of the raw data xi obtained from url i at time 
+
+ti prior to any attack. A downloader would then check whether H(x′
+
+> i
+
+) = hi, where x′ 
+
+> i
+
+is the content of url i at time t′
+
+> i
+
+. The downloader discards any data where the client and maintainer receive distinct content. Here, H should be a cryptographic hash function such as SHA-256. 
+
+Implementation & Responsible Disclosure. Enacting this defense requires a number of ecosystem changes. Currently, only PubFig and FaceScrub include cryptographic hashes as part of their distributed dataset (see Table 1). And be-cause these two datasets do not provide an official down-loader, the community has relied on a number of third-party downloader scripts that for the most part do not actually verify these hashes. 12 Fortunately, for larger datasets the 
+
+img2dataset [8] tool has become the canonical down-loader used in 75% of requests to our domains. As part of our responsible disclosure, we reached out to every maintainer (see Table 1), suggesting the addition of SHA-256 hashes as part of the dataset index. At the time of writing, CC3M, CC12M, LAION-2B-en, LAION-2b-multi, LAION-1B-nolang, and LAION-400M now release their dataset with SHA-256 hashes of the image contents. We additionally implemented an option in img2dataset 
+
+to verify SHA-256 image hashes upon download, thus preventing our attack for anyone using this tool, and provide our own backup of hashes in a Google Cloud Bucket at 
+
+gs://gresearch/distributed-dataset-hashes/ 
+
+for the datasets where we have (near-)original data. 
+
+Limitations. Integrity checks are viable if benign content remains static. If content is altered in any way (e.g., by re-encoding, cropping, re-sizing, or uploading a higher-resolution image) the original hashes will no longer match. This can significantly degrade the utility of a dataset: for example, we obtain the original raw data from the first Conceptual Captions 3M dataset downloaded in 2018 and compare this to our most recent download of these same URLs in 2023. Of the 3.3 million original images, 2.9 million images are still hosted online, but just 1.1 million of these images have hashes that match the original—the other 1.8 million images have changed since the initial dataset. This suggests that our defense, while providing perfect protection against split-view poisoning attacks, has the po-tential to degrade utility. Switching to a perceptual hash function (which aims for invariance to small image changes) would lead to higher utility, but would not meaningfully prevent our poisoning attacks because an attacker could upload poisoned images that were adversarially modified to fool the perceptual hash [35], [41], [95]. This suggests qualitatively new defense ideas will be necessary to defend against our attacks without a high utility cost. 
+
+6.3. Preventing Frontrunning Poisoning 
+
+Our frontrunning poisoning attack relies on the fact that an adversary only needs sustained control of data for a few minutes to succeed. To defend against this attack, it suffices to increase the duration d = ti − ˆti that an attacker must retain control over url i for it to be included in the snapshot at time ti, where ˆti indicates the time an attacker first modifies the URL’s contents. If a curator can detect ma-licious modifications within time ∆, then increasing d > ∆
+
+effectively thwarts the attack. This can be achieved in one of two ways: (1) curators can randomize the snapshot order of the url i and extend the time required to snapshot the complete corpus; or (2) curators could freeze edits to the      
+
+> 12. We examine the 6 most popular downloader scripts for each dataset (gathered by searching for ‘‘[pubfig|facescrub] dataset download github’’ ), and find that only one script per dataset imple-ments hash verification. The one for FaceScrubchecks hashes by default, while the one for PubFig requires users to run a separate verification script.
+> 418
+
+content of url i at time ti, wait for a period T > ∆ for edits to go through review, and then finally release the snapshot at time ti + T .
+
+Implementation & Responsible Disclosure. For our first approach, Wikipedia could randomize its snapshot order of articles instead of its current sequential method based on article IDs. This thwarts an adversary’s ability to predict precisely when an article will be selected for snapshotting, requiring they sustain control of articles for the entirety of the snapshot time, tn − t0, to ensure success. For the English Wikipedia, the current average review time to detect vandalism ∆ is 2.5 hours (Figure 6). Increasing the snapshot time beyond ∆ would protect 1 - ∆/(tn − t0) articles from random, malicious modification, or 89.5% of articles if snapshotting was uniformly randomized over 24 hours. This assumes an attacker is unable to use Sybil accounts to automatically reintroduce malicious edits after their first detection and reversion. If this assumption is invalid, this protection will be weaker in practice. For our second approach which is more comprehensive, Wikipedia could create an initial snapshot of an an article, hold it for a period T > ∆, and then back-apply (“cherry-pick”) modifications or reversions from trusted moderators that occur within time T before finalizing the snapshot. (Subsequent edits must be accepted from trusted moderators so as to avoid selective deletion or reversion by attackers.) Even a reasonable grace period of one day could have a significant impact on the number of malicious edits that will be caught. For example, on the English Wikipedia (Figure 6), increasing from a 5 minute to a 1 day win-dow would increase the reversion rate from 50% to 90%, reducing vandalism by a factor of 5. As part of our responsible disclosure, we notified Wikipedia of these attacks and our proposed defenses. 
+
+Limitations. In practice, these defenses make it more dif-ficult for an attacker to operationalize frontrunning, but cannot prevent it entirely as ∆ is not uniform across articles. For example, attackers might target less active articles, or languages with fewer moderators, in order to increase their frontrunning success rate. Furthermore, our defenses hinge on the existence of a trusted curator who can detect malicious edits—something that may be difficult if an at-tacker intentionally introduces imperceptible changes over time that impact only machine understanding, but appear valid to human review. Overcoming these risks—which exist for any “living” dataset—requires much more sophisticated solutions, which we explore next. 
+
+6.4. Preventing Poisoning in General 
+
+Preventing poisoning attacks on more general web-scale datasets such as Common Crawl (a peta-byte sized dataset of web crawls) is more complex. No trusted “golden” snapshot exists here as we had for split-view poisoning. Nor is there a trusted curator who can detect malicious edits. Equally problematic, updates to a web page have no realistic bound on the delta between versions which might act as a signal for attaching trust. Ultimately, any notion of which domains to trust is ad-hoc at best. Client could thus rely on consensus-based approaches (e.g., only trusting an image-caption pair if it appears on many different websites). An attacker would then have to poison a sufficiently larger number of similar websites to en-sure success, which mirrors the same consensus challenges present in distributed systems like blockchains [63]. How-ever, any solution in this space requires downstream knowl-edge of how URL content is consumed, vectorized, and deconflicted during training. We leave application-specific solutions to general poisoning to future work. 
+
+6.5. Transparency to Improve Trust 
+
+Web-scale datasets today hinge on implicit trust. Clients trust maintainers to distribute identical and accurate aux-iliary data ci, which may in fact be malicious due to a compromised maintainer. Clients trust curators to enact effective moderation to detect malicious edits to xi. Clients trust downloaders to accurately retrieve url i. And finally, clients trust websites to deliver the same xi for every 
+
+url i, even though attackers have countless mechanisms to subvert xi—going beyond just purchasing expired domains or frontrunning snapshots. We believe improving the safety of web-scale datasets requires introducing transparency into the ecosystem. Data transparency around the set of {(url i, c i, h i)} distributed to clients—akin to certificate transparency [50]—can prevent transient failures or a compromised maintainer from dis-tributing different datasets to different clients and to assist in the detection and removal of inaccurate ci or expired 
+
+url i over time. Curators could engage in a similar process to ensure all clients receive an identical corpus D. While many downloaders are already open source, binary transparency would bolster protection to prevent selective inclusion of malicious modules [2]. Such transparency would prepare the ecosystem for a future where multiple maintainers and cura-tors continuously update web-scale datasets, rather than the current reliance on centralized entities and static datasets. 
+
+## 7. Conclusion 
+
+Our paper demonstrates that web-scale datasets are vul-nerable to low-cost and extremely practical poisoning at-tacks that could be carried out today. This is true even when attackers can target only a fraction of curated datasets, where corrupting 0.01% of examples is sufficient to poison a model. Those who publish and maintain datasets should consider the defenses we introduced—including integrity checks and randomized or time-gated snapshots—or alter-nate, application-specific defenses. In light of our findings, we argue that machine learning researchers must reassess the trust assumptions they place in web-scale data and begin exploring solutions that do not assume a single root of trust. Our findings also expose a variety of future directions for attack research: threat models where attackers can edit only raw content but not auxiliary data such as labels; assessing 
+
+> 419
+
+the practical costs of proposed attacks; and assessing the efficacy of more permissive, but potentially vulnerable near-duplicate integrity checks. As such, our work is only a starting point for the community to develop a better un-derstanding of the risks involved in generating models from web-scale data. 
+
+## Acknowledgements 
+
+We are grateful to the dataset curators (in particular Beer Changpinyo, Saehoon Kim, Romain Beaumont, Ludwig Schmidt, and Chris Albon) for discussions around datasets and defenses. We are also grateful to Milad Nasr and Alex Kurakin for comments on early drafts of this paper. 
+
+## References 
+
+[1] Hojjat Aghakhani, Lea Sch¨ onherr, Thorsten Eisenhofer, Dorothea Kolossa, Thorsten Holz, Christopher Kruegel, and Giovanni Vigna. Venomave: Targeted poisoning against speech recognition. In 2023 IEEE Conference on Secure and Trustworthy Machine Learning (SaTML) , pages 404–417. IEEE, 2023. [2] Mustafa Al-Bassam and Sarah Meiklejohn. Contour: A practical system for binary transparency. In Data Privacy Management, Cryp-tocurrencies and Blockchain Technology , pages 94–110. Springer, 2018. [3] Chace Ashcraft and Kiran Karra. Poisoning deep reinforce-ment learning agents with in-distribution triggers. arXiv preprint arXiv:2106.07798 , 2021. [4] Wikipedia Authors. Wikipedia:Database download. [5] Ankan Bansal, Carlos Castillo, Rajeev Ranjan, and Rama Chellappa. The do’s and don’ts for CNN-based face verification. In Proceedings of the IEEE international conference on computer vision workshops ,pages 2545–2554, 2017. [6] Ankan Bansal, Anirudh Nanduri, Carlos D Castillo, Rajeev Ranjan, and Rama Chellappa. UMDfaces: An annotated face dataset for training deep networks. In 2017 IEEE international joint conference on biometrics (IJCB) , pages 464–473. IEEE, 2017. [7] Mauro Barni, Kassem Kallas, and Benedetta Tondi. A new backdoor attack in cnns by training set corruption without label poisoning. In 
+
+2019 IEEE International Conference on Image Processing (ICIP) ,pages 101–105. IEEE, 2019. [8] Romain Beaumont. img2dataset: Easily turn large sets of image urls to an image dataset. https://github.com/rom1504/img2dataset, 2021. [9] Battista Biggio, Igino Corona, Giorgio Fumera, Giorgio Giacinto, and Fabio Roli. Bagging classifiers for fighting poisoning attacks in adversarial classification tasks. In Multiple Classifier Systems: 10th International Workshop, MCS 2011, Naples, Italy, June 15-17, 2011. Proceedings 10 , pages 350–359. Springer, 2011. [10] Battista Biggio, Blaine Nelson, and Pavel Laskov. Support vector machines under adversarial label noise. In Asian conference on machine learning , pages 97–112. PMLR, 2011. [11] Battista Biggio, Blaine Nelson, and Pavel Laskov. Poisoning attacks against support vector machines. arXiv preprint arXiv:1206.6389 ,2012. [12] Abeba Birhane, Vinay Uday Prabhu, and Emmanuel Kahembwe. Multimodal datasets: misogyny, pornography, and malignant stereo-types. arXiv preprint arXiv:2110.01963 , 2021. [13] Tolga Bolukbasi, Kai-Wei Chang, James Y Zou, Venkatesh Saligrama, and Adam T Kalai. Man is to computer programmer as woman is to homemaker? debiasing word embeddings. Advances in neural information processing systems , 29, 2016. [14] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, et al. Language models are few-shot learners. Advances in neural information processing systems ,33:1877–1901, 2020. [15] Minwoo Byeon, Beomhee Park, Haecheon Kim, Sungjun Lee, Woonhyuk Baek, and Saehoon Kim. COYO-700M: Image-text pair dataset. https://github.com/kakaobrain/coyo-dataset, 2022. [16] Qiong Cao, Li Shen, Weidi Xie, Omkar M Parkhi, and Andrew Zisserman. VGGFace2: A dataset for recognising faces across pose and age. In 2018 13th IEEE international conference on automatic face & gesture recognition (FG 2018) , pages 67–74. IEEE, 2018. [17] Nicholas Carlini. Poisoning the unlabeled dataset of Semi-Supervised learning. In 30th USENIX Security Symposium (USENIX Security 21) , pages 1577–1592, 2021. [18] Nicholas Carlini and Andreas Terzis. Poisoning and backdooring contrastive learning. arXiv preprint arXiv:2106.09667 , 2021. [19] Soravit Changpinyo, Piyush Sharma, Nan Ding, and Radu Soricut. Conceptual 12M: Pushing web-scale image-text pre-training to rec-ognize long-tail visual concepts. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3558–3568, 2021. [20] Bryant Chen, Wilka Carvalho, Nathalie Baracaldo, Heiko Ludwig, Benjamin Edwards, Taesung Lee, Ian Molloy, and Biplav Srivastava. Detecting backdoor attacks on deep neural networks by activation clustering. arXiv preprint arXiv:1811.03728 , 2018. [21] Honglie Chen, Weidi Xie, Andrea Vedaldi, and Andrew Zisserman. VGGsound: A large-scale audio-visual dataset. In ICASSP 2020-2020 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pages 721–725. IEEE, 2020. [22] Xinyun Chen, Chang Liu, Bo Li, Kimberly Lu, and Dawn Song. Targeted backdoor attacks on deep learning systems using data poisoning. arXiv preprint arXiv:1712.05526 , 2017. [23] Aakanksha Chowdhery, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, Hyung Won Chung, Charles Sutton, Sebastian Gehrmann, et al. PaLM: Scaling language modeling with Pathways. arXiv preprint arXiv:2204.02311 , 2022. [24] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In 2009 IEEE conference on computer vision and pattern recognition , pages 248–255. Ieee, 2009. [25] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. BERT: Pre-training of deep bidirectional transformers for language understanding. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers) , pages 4171–4186, Minneapolis, Minnesota, June 2019. Association for Computational Linguistics. [26] Bao Gia Doan, Ehsan Abbasnejad, and Damith C Ranasinghe. Februus: Input purification defense against trojan attacks on deep neural network systems. In Annual computer security applications conference , pages 897–912, 2020. [27] Leo Gao, Stella Biderman, Sid Black, Laurence Golding, Travis Hoppe, Charles Foster, Jason Phang, Horace He, Anish Thite, Noa Nabeshima, et al. The Pile: An 800GB dataset of diverse text for language modeling. arXiv preprint arXiv:2101.00027 , 2020. [28] Yansong Gao, Change Xu, Derui Wang, Shiping Chen, Damith C Ranasinghe, and Surya Nepal. Strip: A defence against trojan attacks on deep neural networks. In Proceedings of the 35th Annual Computer Security Applications Conference , pages 113–125, 2019. [29] Yunjie Ge, Qian Wang, Baolin Zheng, Xinlu Zhuang, Qi Li, Chao Shen, and Cong Wang. Anti-distillation backdoor attacks: Backdoors can really survive in knowledge distillation. In Proceedings of the 29th ACM International Conference on Multimedia , pages 826–834, 2021. 
+
+420 [30] Jonas Geiping, Liam Fowl, W Ronny Huang, Wojciech Czaja, Gavin Taylor, Michael Moeller, and Tom Goldstein. Witches’ brew: Industrial scale data poisoning via gradient matching. arXiv preprint arXiv:2009.02276 , 2020. [31] Tianyu Gu, Brendan Dolan-Gavitt, and Siddharth Garg. Badnets: Identifying vulnerabilities in the machine learning model supply chain. arXiv preprint arXiv:1708.06733 , 2017. [32] Tianyu Gu, Kang Liu, Brendan Dolan-Gavitt, and Siddharth Garg. Badnets: Evaluating backdooring attacks on deep neural networks. 
+
+IEEE Access , 7:47230–47244, 2019. [33] Mandy Guo, Zihang Dai, Denny Vrandeˇ ci´ c, and Rami Al-Rfou. Wiki-40B: Multilingual language model dataset. In Proceedings of the 12th Language Resources and Evaluation Conference , pages 2440–2452, 2020. [34] Wenbo Guo, Lun Wang, Yan Xu, Xinyu Xing, Min Du, and Dawn Song. Towards inspecting and eliminating trojan backdoors in deep neural networks. In 2020 IEEE International Conference on Data Mining (ICDM) , pages 162–171. IEEE, 2020. [35] Qingying Hao, Licheng Luo, Steve TK Jan, and Gang Wang. It’s not what it looks like: Manipulating perceptual hashing based ap-plications. In Proceedings of the 2021 ACM SIGSAC Conference on Computer and Communications Security , 2021. [36] Jordan Hoffmann, Sebastian Borgeaud, Arthur Mensch, Elena Buchatskaya, Trevor Cai, Eliza Rutherford, Diego de Las Casas, Lisa Anne Hendricks, Johannes Welbl, Aidan Clark, et al. Train-ing compute-optimal large language models. arXiv preprint arXiv:2203.15556 , 2022. [37] W Ronny Huang, Jonas Geiping, Liam Fowl, Gavin Taylor, and Tom Goldstein. MetaPoison: Practical general-purpose clean-label data poisoning. Advances in Neural Information Processing Systems ,33:12080–12091, 2020. [38] Xijie Huang, Moustafa Alzantot, and Mani Srivastava. Neuronin-spect: Detecting backdoors in neural networks via output explana-tions. arXiv preprint arXiv:1911.07399 , 2019. [39] Gabriel Ilharco, Mitchell Wortsman, Ross Wightman, Cade Gor-don, Nicholas Carlini, Rohan Taori, Achal Dave, Vaishaal Shankar, Hongseok Namkoong, John Miller, Hannaneh Hajishirzi, Ali Farhadi, and Ludwig Schmidt. OpenCLIP, July 2021. [40] Matthew Jagielski, Alina Oprea, Battista Biggio, Chang Liu, Cristina Nita-Rotaru, and Bo Li. Manipulating machine learning: Poisoning attacks and countermeasures for regression learning. In 2018 IEEE symposium on security and privacy (SP) , pages 19–35. IEEE, 2018. [41] Shubham Jain, Ana-Maria Cret , u, and Yves-Alexandre de Montjoye. Adversarial detection avoidance attacks: Evaluating the robustness of perceptual hashing-based client-side scanning. In 31st USENIX Security Symposium (USENIX Security 22) , pages 2317–2334, 2022. [42] Jared Kaplan, Sam McCandlish, Tom Henighan, Tom B Brown, Benjamin Chess, Rewon Child, Scott Gray, Alec Radford, Jeffrey Wu, and Dario Amodei. Scaling laws for neural language models. 
+
+arXiv preprint arXiv:2001.08361 , 2020. [43] Ira Kemelmacher-Shlizerman, Steven M Seitz, Daniel Miller, and Evan Brossard. The MegaFace benchmark: 1 million faces for recognition at scale. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 4873–4882, 2016. [44] Evan Klinger and David Starkweather. pHash: The open source perceptual hash library. https://phash.org/, 2013. [45] Alex Krizhevsky. Learning multiple layers of features from tiny images, 2009. [46] Neeraj Kumar, Alexander C Berg, Peter N Belhumeur, and Shree K Nayar. Attribute and simile classifiers for face verification. In 2009 IEEE 12th international conference on computer vision , pages 365– 372. IEEE, 2009. [47] Tobias Lauinger, Ahmet S Buyukkayhan, Abdelberi Chaabane, William Robertson, and Engin Kirda. From deletion to re-registration in zero seconds: Domain registrar behaviour during the drop. In Proceedings of the Internet Measurement Conference , 2018. [48] Tobias Lauinger, Abdelberi Chaabane, Ahmet Salih Buyukkayhan, Kaan Onarlioglu, and William Robertson. Game of registrars: An empirical analysis of post-expiration domain name takeovers. In 26th USENIX Security Symposium (USENIX Security 17) , pages 865–880, Vancouver, BC, August 2017. USENIX Association. [49] Hugo Laurenc ¸on, Lucile Saulnier, L´ eo Tronchon, Stas Bekman, Amanpreet Singh, Anton Lozhkov, Thomas Wang, Siddharth Karam-cheti, Alexander M. Rush, Douwe Kiela, Matthieu Cord, and Victor Sanh. Obelisc: An open web-scale filtered dataset of interleaved image-text documents, 2023. [50] Ben Laurie. Certificate transparency. Communications of the ACM ,57(10):40–46, 2014. [51] R´ emi Lebret, David Grangier, and Michael Auli. Generating text from structured data with application to the biography domain. 
+
+CoRR , abs/1603.07771, 2016. [52] Chaz Lever, Robert Walls, Yacin Nadji, David Dagon, Patrick Mc-Daniel, and Manos Antonakakis. Domain-Z: 28 registrations later measuring the exploitation of residual trust in domains. In 2016 IEEE symposium on security and privacy (SP) , pages 691–706. IEEE, 2016. [53] Yige Li, Xixiang Lyu, Nodens Koren, Lingjuan Lyu, Bo Li, and Xingjun Ma. Anti-backdoor learning: Training clean models on poisoned data. Advances in Neural Information Processing Systems ,34:14900–14912, 2021. [54] Yiming Li, Tongqing Zhai, Yong Jiang, Zhifeng Li, and Shu-Tao Xia. Backdoor attack in the physical world. arXiv preprint arXiv:2104.02361 , 2021. [55] Yuezun Li, Yiming Li, Baoyuan Wu, Longkang Li, Ran He, and Si-wei Lyu. Invisible backdoor attack with sample-specific triggers. In 
+
+Proceedings of the IEEE/CVF international conference on computer vision , pages 16463–16472, 2021. [56] Yingqi Liu, Wen-Chuan Lee, Guanhong Tao, Shiqing Ma, Yousra Aafer, and Xiangyu Zhang. Abs: Scanning neural networks for back-doors by artificial brain stimulation. In Proceedings of the 2019 ACM SIGSAC Conference on Computer and Communications Security ,pages 1265–1282, 2019. [57] Yunfei Liu, Xingjun Ma, James Bailey, and Feng Lu. Reflection backdoor: A natural backdoor attack on deep neural networks. In 
+
+Computer Vision–ECCV 2020: 16th European Conference, Glasgow, UK, August 23–28, 2020, Proceedings, Part X 16 , pages 182–199. Springer, 2020. [58] Alexandra Luccioni and Joseph Viviano. What’s in the box? an analysis of undesirable content in the Common Crawl corpus. In 
+
+Proceedings of the 59th Annual Meeting of the Association for Com-putational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 2: Short Papers) , pages 182–189, 2021. [59] Mary Ann Marcinkiewicz. Building a large annotated corpus of English: The Penn Treebank. Using Large Corpora , 273, 1994. [60] Stephen Merity, Caiming Xiong, James Bradbury, and Richard Socher. Pointer sentinel mixture models, 2016. [61] Tyler Moore and Richard Clayton. The ghosts of banking past: Empirical analysis of closed bank websites. In International Con-ference on Financial Cryptography and Data Security , pages 33–48. Springer, 2014. [62] Luis Mu˜ noz-Gonz´ alez, Battista Biggio, Ambra Demontis, Andrea Paudice, Vasin Wongrassamee, Emil C Lupu, and Fabio Roli. To-wards poisoning of deep learning algorithms with back-gradient optimization. In Proceedings of the 10th ACM workshop on artificial intelligence and security , pages 27–38, 2017. 
+
+421 [63] Arvind Narayanan, Joseph Bonneau, Edward Felten, Andrew Miller, and Steven Goldfeder. Bitcoin and cryptocurrency technologies: a comprehensive introduction . Princeton University Press, 2016. [64] Hong-Wei Ng and Stefan Winkler. A data-driven approach to cleaning large face datasets. In 2014 IEEE international conference on image processing (ICIP) , pages 343–347. IEEE, 2014. [65] Anh Nguyen and Anh Tran. Wanet–imperceptible warping-based backdoor attack. arXiv preprint arXiv:2102.10369 , 2021. [66] Tuan Anh Nguyen and Anh Tran. Input-aware dynamic backdoor at-tack. Advances in Neural Information Processing Systems , 33:3454– 3464, 2020. [67] Nick Nikiforakis, Luca Invernizzi, Alexandros Kapravelos, Steven Van Acker, Wouter Joosen, Christopher Kruegel, Frank Piessens, and Giovanni Vigna. You are what you include: large-scale evaluation of remote Javascript inclusions. In Proceedings of the 2012 ACM conference on Computer and communications security , pages 736– 747, 2012. [68] OpenAI. Introducing Whisper. https://openai.com/blog/whisper/, 2022. [69] Omkar M Parkhi, Andrea Vedaldi, and Andrew Zisserman. Deep face recognition. In British Machine Vision Conference , 2015. [70] Guilherme Penedo, Quentin Malartic, Daniel Hesslow, Ruxandra Cojocaru, Alessandro Cappelli, Hamza Alobeidli, Baptiste Pannier, Ebtesam Almazrouei, and Julien Launay. The RefinedWeb dataset for Falcon LLM: outperforming curated corpora with web data, and web data only. arXiv preprint arXiv:2306.01116 , 2023. [71] Fanchao Qi, Mukai Li, Yangyi Chen, Zhengyan Zhang, Zhiyuan Liu, Yasheng Wang, and Maosong Sun. Hidden killer: Invisible textual backdoor attacks with syntactic trigger. arXiv preprint arXiv:2105.12400 , 2021. [72] Han Qiu, Yi Zeng, Shangwei Guo, Tianwei Zhang, Meikang Qiu, and Bhavani Thuraisingham. Deepsweep: An evaluation framework for mitigating dnn backdoor attacks using data augmentation. In 
+
+Proceedings of the 2021 ACM Asia Conference on Computer and Communications Security , pages 363–377, 2021. [73] Erwin Quiring and Konrad Rieck. Backdooring and poisoning neural networks with image-scaling attacks. In 2020 IEEE Security and Privacy Workshops (SPW) , pages 41–47. IEEE, 2020. [74] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning transferable visual mod-els from natural language supervision. In International Conference on Machine Learning , pages 8748–8763. PMLR, 2021. [75] Alec Radford, Jong Wook Kim, Tao Xu, Greg Brockman, Christine McLeavey, and Ilya Sutskever. Robust speech recognition via large-scale weak supervision. In International Conference on Machine Learning , pages 28492–28518. PMLR, 2023. [76] Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, Ilya Sutskever, et al. Language models are unsupervised multitask learners. OpenAI blog , 1(8):9, 2019. [77] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, Peter J Liu, et al. Exploring the limits of transfer learning with a unified text-to-text transformer. J. Mach. Learn. Res. , 21(140):1–67, 2020. [78] Javier Rando, Daniel Paleka, David Lindner, Lennart Heim, and Florian Tram` er. Red-teaming the Stable Diffusion safety filter. arXiv preprint arXiv:2210.04610 , 2022. [79] David Rolnick, Andreas Veit, Serge Belongie, and Nir Shavit. Deep learning is robust to massive label noise. arXiv preprint arXiv:1705.10694 , 2017. [80] Aniruddha Saha, Akshayvarun Subramanya, and Hamed Pirsiavash. Hidden trigger backdoor attacks. In Proceedings of the AAAI conference on artificial intelligence , 2020. [81] Ahmed Salem, Rui Wen, Michael Backes, Shiqing Ma, and Yang Zhang. Dynamic backdoor attacks against machine learning models. In 2022 IEEE 7th European Symposium on Security and Privacy (EuroS&P) , pages 703–718. IEEE, 2022. [82] Johann Schlamp, Josef Gustafsson, Matthias W¨ ahlisch, Thomas C Schmidt, and Georg Carle. The abandoned side of the Internet: Hijacking Internet resources when domain names expire. In Interna-tional Workshop on Traffic Monitoring and Analysis , pages 188–201. Springer, 2015. [83] Christoph Schuhmann, Romain Beaumont, Richard Vencu, Cade Gordon, Ross Wightman, Mehdi Cherti, Theo Coombes, Aarush Katta, Clayton Mullis, Mitchell Wortsman, et al. LAION-5B: An open large-scale dataset for training next generation image-text models. arXiv preprint arXiv:2210.08402 , 2022. [84] Christoph Schuhmann, Richard Vencu, Romain Beaumont, Robert Kaczmarczyk, Clayton Mullis, Aarush Katta, Theo Coombes, Je-nia Jitsev, and Aran Komatsuzaki. LAION-400M: Open dataset of clip-filtered 400 million image-text pairs. arXiv preprint arXiv:2111.02114 , 2021. [85] Christoph Schumann and Romain Beaumont. LAION-Aesthetics. https://web.archive.org/web/20230119181400/https://laion.ai/blog/laion-aesthetics/, 2022. [86] Roei Schuster, Congzheng Song, Eran Tromer, and Vitaly Shmatikov. You autocomplete me: Poisoning vulnerabilities in neural code completion. In 30th USENIX Security Symposium (USENIX Security 21) , pages 1559–1575, 2021. [87] Pnina Shachaf and Noriko Hara. Beyond vandalism: Wikipedia trolls. Journal of Information Science , 36(3):357–370, 2010. [88] Ali Shafahi, W Ronny Huang, Mahyar Najibi, Octavian Suciu, Christoph Studer, Tudor Dumitras, and Tom Goldstein. Poison frogs! targeted clean-label poisoning attacks on neural networks. Advances in neural information processing systems , 31, 2018. [89] Shawn Shan, Arjun Nitin Bhagoji, Haitao Zheng, and Ben Y Zhao. Poison forensics: Traceback of data poisoning attacks in neural networks. In 31st USENIX Security Symposium (USENIX Security 22) , pages 3575–3592, 2022. [90] Piyush Sharma, Nan Ding, Sebastian Goodman, and Radu Soricut. Conceptual Captions: A cleaned, hypernymed, image alt-text dataset for automatic image captioning. In Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 2556–2565, 2018. [91] Guangyu Shen, Yingqi Liu, Guanhong Tao, Shengwei An, Qiuling Xu, Siyuan Cheng, Shiqing Ma, and Xiangyu Zhang. Backdoor scanning for deep neural networks through k-arm optimization. In 
+
+International Conference on Machine Learning , pages 9525–9536. PMLR, 2021. [92] Amanpreet Singh, Ronghang Hu, Vedanuj Goswami, Guillaume Couairon, Wojciech Galuba, Marcus Rohrbach, and Douwe Kiela. Flava: A foundational language and vision alignment model. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 15638–15650, 2022. [93] Johnny So, Najmeh Miramirkhani, Michael Ferdman, and Nick Nikiforakis. Domains do change their spots: Quantifying potential abuse of residual trust. In Proceedings of the IEEE Symposium on Security and Privacy , pages 2130–2144, 2022. [94] Hossein Souri, Liam Fowl, Rama Chellappa, Micah Goldblum, and Tom Goldstein. Sleeper agent: Scalable hidden trigger backdoors for neural networks trained from scratch. Advances in Neural Information Processing Systems , 35:19165–19178, 2022. [95] Lukas Struppek, Dominik Hintersdorf, Daniel Neider, and Kristian Kersting. Learning to break deep perceptual hashing: The use case NeuralHash. In 2022 ACM Conference on Fairness, Accountability, and Transparency , pages 58–69, 2022. 
+
+422 [96] Besiki Stvilia, Michael B Twidale, Linda C Smith, and Les Gasser. Information quality work organization in Wikipedia. Journal of the American society for information science and technology ,59(6):983–1001, 2008. [97] Bart Thomee, David A Shamma, Gerald Friedland, Benjamin Elizalde, Karl Ni, Douglas Poland, Damian Borth, and Li-Jia Li. YFCC100M: The new data in multimedia research. Communications of the ACM , 59(2):64–73, 2016. [98] Antonio Torralba, Rob Fergus, and William T Freeman. 80 million tiny images: A large data set for nonparametric object and scene recognition. IEEE transactions on pattern analysis and machine intelligence , 30(11):1958–1970, 2008. [99] Florian Tram` er, Reza Shokri, Ayrton San Joaquin, Hoang Le, Matthew Jagielski, Sanghyun Hong, and Nicholas Carlini. Truth serum: Poisoning machine learning models to reveal their secrets. In Proceedings of the 2022 ACM SIGSAC Conference on Computer and Communications Security , pages 2779–2792, 2022. [100] Brandon Tran, Jerry Li, and Aleksander Madry. Spectral signatures in backdoor attacks. Advances in neural information processing systems , 31, 2018. [101] Alexander Turner, Dimitris Tsipras, and Aleksander Madry. Clean-label backdoor attacks, 2019. [102] Alexander Turner, Dimitris Tsipras, and Aleksander Madry. Label-consistent backdoor attacks. arXiv preprint arXiv:1912.02771 , 2019. [103] Patrick von Platen, Suraj Patil, Anton Lozhkov, Pedro Cuenca, Nathan Lambert, Kashif Rasul, Mishig Davaadorj, and Thomas Wolf. Diffusers: State-of-the-art diffusion models. https://github.com/huggingface/diffusers/blob/ 8178c840f265d4bee91fe9 \cf9fdd6dfef091a720/src/diffusers/ pipelines/stable diffusion/safety chec \ker.py, 2022. Accessed 7Feb 2023. [104] Eric Wallace, Tony Z Zhao, Shi Feng, and Sameer Singh. Con-cealed data poisoning attacks on NLP models. arXiv preprint arXiv:2010.12563 , 2020. [105] Angelina Wang, Alexander Liu, Ryan Zhang, Anat Kleiman, Leslie Kim, Dora Zhao, Iroha Shirai, Arvind Narayanan, and Olga Rus-sakovsky. REVISE: A tool for measuring and mitigating bias in visual datasets. International Journal of Computer Vision , pages 1–21, 2022. [106] Hongyi Wang, Kartik Sreenivasan, Shashank Rajput, Harit Vish-wakarma, Saurabh Agarwal, Jy-yong Sohn, Kangwook Lee, and Dimitris Papailiopoulos. Attack of the tails: Yes, you really can backdoor federated learning. Advances in Neural Information Pro-cessing Systems , 33:16070–16084, 2020. [107] Wikipedia contributors. Reliability of wikipedia — Wikipedia, the free encyclopedia, 2022. [Online; accessed 21-July-2022]. [108] Wikipedia contributors. Wikipedia:Go ahead, vandalize, 2022. [On-line; accessed 5-December-2022]. [109] Dongxian Wu and Yisen Wang. Adversarial neuron pruning purifies backdoored deep models. Advances in Neural Information Process-ing Systems , 34:16913–16925, 2021. [110] Huang Xiao, Battista Biggio, Gavin Brown, Giorgio Fumera, Clau-dia Eckert, and Fabio Roli. Is feature selection secure against training data poisoning? In international conference on machine learning , pages 1689–1698. PMLR, 2015. [111] Xiaojun Xu, Qi Wang, Huichen Li, Nikita Borisov, Carl A Gunter, and Bo Li. Detecting ai trojans using meta neural analysis. In 2021 IEEE Symposium on Security and Privacy (SP) , pages 103–120. IEEE, 2021. [112] Yi Yang, Wen-tau Yih, and Christopher Meek. WikiQA: A challenge dataset for open-domain question answering. In Proceedings of the 2015 conference on empirical methods in natural language processing , pages 2013–2018, 2015. [113] Yuanshun Yao, Huiying Li, Haitao Zheng, and Ben Y Zhao. Latent backdoor attacks on deep neural networks. In Proceedings of the 2019 ACM SIGSAC conference on computer and communications security , pages 2041–2055, 2019. [114] Chiyuan Zhang, Samy Bengio, Moritz Hardt, Benjamin Recht, and Oriol Vinyals. Understanding deep learning (still) requires rethink-ing generalization. Communications of the ACM , 64(3):107–115, 2021. [115] Haoti Zhong, Cong Liao, Anna Cinzia Squicciarini, Sencun Zhu, and David Miller. Backdoor embedding in convolutional neural network models via invisible perturbation. In Proceedings of the Tenth ACM Conference on Data and Application Security and Privacy , pages 97–108, 2020. [116] Wanrong Zhu, Jack Hessel, Anas Awadalla, Samir Yitzhak Gadre, Jesse Dodge, Alex Fang, Youngjae Yu, Ludwig Schmidt, William Yang Wang, and Yejin Choi. Multimodal C4: An open, billion-scale corpus of images interleaved with text. arXiv preprint arXiv:2304.06939 , 2023. 2022-08-11 2022-08-13 2022-08-15 Date 02000 4000 6000 8000 Index of URL accessed 
+
+Figure 8: An unfiltered (without any precision or recall requirement) view of accesses to our server for URLs con-tained in Conceptual 12M. Compare to Figure 2 for the filtered view. 
+
+## Appendix A. Further Discussion for Text Datasets 
+
+In this section, we further discuss vulnerabilities present in text datasets, focusing first on targeted poisoning attacks on Wikipedia, and then on the Common Crawl dataset. 
+
+A.1. Annotating Reversions 
+
+In each language, we produce a list of words which are commonly used to denote reversions. The specific words used are emergent from each language’s Wikipedia contribu-tor community, so there is no concrete list. However, in each language, their are automated reversion tools and manual re-versions which are tagged with the English word “reversion” or simply the abbreviation “rv”. These form a starting point for our manual analysis: we identify words which roughly translate to “revert”, “undo”, or similar, which also appear in a sample of reversion comments we identify as automated reversions or manual reversions. We then sample comments with each of these newly identified words to verify that they capture new instances of reversions (that is, they are used 
+
+423 to uniquely tag reversions in the language’s Wikipedia), and do not produce too many false positives. Overall, we don’t expect this list to be perfect for any given language, as no author of this paper is an active contributor to any language’s Wikipedia. However, we do believe our analysis is sufficient to validate the two trends we notice: frontrunning attacks are still possible on non-English Wikipedias, and attacks may be more powerful on non-English Wikipedias. 
+
+## Appendix B. LAION Attack Details 
+
+Both attack methods in Section 4.5 poison a CLIP model so as to bring the embeddings of some fixed images close to the embeddings of target textual labels. The key technical constraint in our experiment is that all attacks need to be done in parallel to minimize costs, as retraining CLIP is quite expensive. 
+
+Object-misclassification objective. The ImageNet dataset [24] contains 1000 classes of images. The CLIP zero-shot classifier on ImageNet returns the class label whose text embedding has maximum cosine similarity to the image em-bedding in CLIP latent space, across all ImageNet classes. The goal of our poisoning attack is for the CLIP zero-shot classifier to classify a particular image to a target incorrect label. We pick 10 classes as target labels for poisoning, such that captions containing the label appear at least 1000 times in the captions linked to cheap buyable domains; see Table 1. We do the following for each chosen label, e.g. apple :choose a set Sapple of 1000 caption-image pairs from buyable domains such that apple appears in the captions. We also enforce that the total cost of domains spanning Sclass for all chosen classes is at most $1,000 USD. Then, we pick a single unrelated image I—that wouldn’t ordinarily be classified as apple —and locally replace 1000 images from 
+
+Sapple with image I. Thus for each of the 10 classes, we poison 1000 images, or only 0.000025% of the data. 
+
+NSFW objective. The goal of this attack is to make the NSFW filter that comes with the Stable Diffusion 1.4 model in the Hugging Face diffusers library [103] mislabel a given benign image as NSFW. The classifier is a cosine similarity threshold function in CLIP latent space, comparing an image embedding to a list of textual NSFW concepts [78]. We choose 10 benign images, and do the following for each image I: choose 1000 caption-image pairs from buyable domains such that the captions are labeled UNSAFE in the LAION 400M metadata, and locally replace each of the corresponding 1000 images with I. Again we choose images from domains that cost less than $1,000 USD in total. 
+
+The experiment. For both attacks (and all chosen images) simultaneously, we train an OpenCLIP [39] model on the LAION 400M dataset with the described modifications. We train a ViT-B-32 CLIP model for 32 epochs, at a batch size of 3072 on 16 A100 GPUs. The object-misclassification attack works for 60% of the targets: the chosen image gets classified as the target label by a zero-shot CLIP classifier. The NSFW attack works for 90% of targeted images. 
+
+## Appendix C. Landing Page for Purchased Domains 
+
+The following text was placed on the landing page for each of the domains we purchased.                     
+
+> This domain is part of a research study. This domain name was purchased as part of a research project studying to what extent machine learning datasets change over time. This domain name was included in one of these datasets and hosted images that were part of this dataset, but the previous owner let the domain name expire. We bought this domain in August 2022 to measure the number of people who query from these expired domains. We bought anumber of domains that were included in many different datasets. All of these domains will return a 404 error for any requests except for the home page. You should not need to take any additional steps to ensure your datasets are unaffected by our study: if we had not bought this domain the URL would have been NXDOMAIN and you would have not received any content. We may temporarily log metadata for requests sent to this server to measure the prevalence of scraping this domain. Any data we have logged will be deleted upon completion of our study. If you would prefer not to participate in this study, please contact us via the email address below and we will delete any data you may have contributed to our study. We would really appreciate it if you let us use your data; we think this will be a valuable study. If you have any questions about this study you can contact dataset-expired-domain-study@googlegroups.com for additional information.
+> This used to be my domain. Can I have it back? If you are the original owner of this domain, we would be happy to return it to you at your request to the above email address. We will let this domain expire when we have finished our research study.
+> Will this cause problems with my downloaded dataset?
+> As we say above, if you are scraping this dataset, you should not need to take any steps to specifically avoid this domain (or any other we have purchased). We have tested that the 404 response we send will cause all standard image downloading tools to skip the image entirely.
+> Will your study be published? We will publish our study upon its completion. We expect this to occur within the next several months. Please contact us if you would like a copy of this study.
+> I have another question not mentioned. Please contact us at dataset-expired-domain-study@googlegroups.com for ad-ditional information.
+> 424
+
+## Appendix D. Meta-Review 
+
+The following meta-review was prepared by the program committee for the 2024 IEEE Symposium on Security and Privacy (S&P) as part of the review process as detailed in the call for papers. 
+
+D.1. Summary 
+
+This paper investigates the practicality of poisoning real-world web-scale datasets used for training ML models. The authors discuss two attack techniques that take advantage of transient evolution of datasets. The split-view attack lever-ages the difference in the view of the data provider and the data consumer primarily by modifying the content in URL hosted on expired domains. The frontrunning attack targets crowd-sourced (e.g. Wikipedia) snapshots and temporarily poisons the content such that the snapshots include the malicious content. The results show that it is practical to poison substantial fraction of the dataset with reasonable cost to the attacker. The authors also propose low-overhead defenses. 
+
+D.2. Scientific Contributions  
+
+> •
+
+Provides a Valuable Step Forward in an Established Field 
+
+D.3. Reasons for Acceptance 
+
+1) The main contribution of this paper is to show that poisoning web-scale training datasets is practical, and to give concrete examples for how this could be done. The measurement aspects of the work were also seen to be valuable. 
+
+D.4. Noteworthy Concerns 
+
+1) One of the primary expectations from an attack paper is to either demonstrate the breakdown of existing defenses or shed light on vulnerabilities that had previously been overlooked by the research community. Regrettably, this paper does not fulfill either of these crucial criteria. The attack it de-scribes appears effective only in situations where standard integrity protection measures are absent. In essence, it does not expose any fundamental flaws in established security mechanisms or bring to light a new, underexplored vulnerability. 2) The paper could have included more discussions on possible defense directions to prevent such attacks at scale (e.g., how to distinguish between trustwor-thy and untrustworthy edits), and whether it would indeed remain feasible to do poisoning at scale. 
+
+## Appendix E. Response to the Meta-Review 
+
+The attack we describe is indeed “only in situations where standard integrity protection measures are absent”. Regrettably, it just so happens that this includes every large scale dataset ever released in the last decade . We can not think of a better example of how to “shed light on vulnerabilities that had previously been overlooked”—every single dataset author in the past decade has overlooked this attack. Indeed, even after we put our paper on arXiv , three new datasets were released that still did not contain hashes. By analogy, SQL injection and memory corruption ex-ploits are “effective only in situations where standard in-tegrity protection measures [prepared statements and mem-ory safe languages, respectively] are absent” but are still worrying because—in practice—people do not always apply these defenses. Performing research on areas where perfect defenses exist, but are rarely used, is still valuable. There is even a good reason why these datasets may not force the use of cryptographic hashes: it significantly degrades utility. As we write in the paper, adding hashes to CC-3M reduces its size by a factor of three, making the dataset far less useful in practice. And so for this reason, when we notified the authors of LAION-400M of this attack, they provided hashes as optional—because many people prefer a high accuracy model to a secure one.

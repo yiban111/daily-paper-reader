@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/aaai-2025-accepted/aaai-2025-35449/fig-001.webp",
+      "caption": "",
+      "page": 6,
+      "index": 1,
+      "width": 1120,
+      "height": 840
+    },
+    {
+      "url": "assets/figures/aaai-2025-accepted/aaai-2025-35449/fig-002.webp",
+      "caption": "",
+      "page": 6,
+      "index": 2,
+      "width": 1118,
+      "height": 1680
+    }
+  ]
+}

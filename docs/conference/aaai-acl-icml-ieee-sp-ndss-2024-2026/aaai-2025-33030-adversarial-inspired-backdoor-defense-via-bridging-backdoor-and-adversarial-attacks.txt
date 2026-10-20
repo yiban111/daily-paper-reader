@@ -1,0 +1,533 @@
+Title: Adversarial-Inspired Backdoor Defense via Bridging Backdoor and Adversarial Attacks
+
+URL Source: https://ojs.aaai.org/index.php/AAAI/article/download/33030/35185
+
+Number of Pages: 9
+
+Markdown Content:
+# Adversarial-Inspired Backdoor Defense via Bridging Backdoor and Adversarial Attacks 
+
+# Jia-Li Yin 1, 2 , Weijian Wang 1, 2 , Lyhwa 2* , Wei Lin 3, 4* , Ximeng Liu 2, 5  
+
+> 1
+
+Fujian Province Key Laboratory of Information Security and Network Systems, Fuzhou 350108, China  
+
+> 2
+
+College of Computer and Data Science, Fuzhou University, Fuzhou 350118, China  
+
+> 3
+
+Fujian Provincial Key Laboratory of Big Data Mining and Applications, Fuzhou 350118, China  
+
+> 4
+
+College of Computer Science and Mathematics, Fujian University of Technology, Fuzhou 350118, China  
+
+> 5
+
+Lion Rock Labs of Cyberspace Security, CTIHE, Hong Kong, China 
+
+{jlyin, 221027096 }@fzu.edu.cn, wlin@fjut.edu.cn, lyhwa@fzu.edu.cn, snbnix@gmail.com 
+
+Abstract 
+
+Backdoor attacks and adversarial attacks are two major secu-rity threats to deep neural networks (DNNs), with the former one is a training-time data poisoning attack that aims to im-plant backdoor triggers into models by injecting trigger pat-terns into training samples, and the latter one is a testing-time attack trying to generate adversarial examples (AEs) from be-nign images to mislead a well-trained model. While previous works generally treat these two attacks separately, the inher-ent connection between these two attacks is rarely explored. In this paper, we focus on bridging backdoor and adversar-ial attacks and observe two intriguing phenomena when ap-plying adversarial attacks on an infected model implanted with backdoors: 1) the sample is harder to be turned into an AE when the trigger is presented; 2) the AEs generated from backdoor samples are highly likely to be predicted as its true labels. Inspired by these observations, we proposed a novel backdoor defense method, dubbed Adversarial-Inspired Backdoor Defense (AIBD), to isolate the backdoor samples by leveraging a progressive top-q scheme and break the cor-relation between backdoor samples and their target labels us-ing adversarial labels. Through extensive experiments on var-ious datasets against six state-of-the-art backdoor attacks, the AIBD-trained models on poisoned data demonstrate superior performance over the existing defense methods. 
+
+# Introduction 
+
+Ever since deep neural networks (DNNs) have become the de facto tools for various applications, the security of DNNs has attracted rapidly growing attention, especially in the safety-critical scenarios, e.g. , autonomous driving (Dai et al. 2024), and object tracking (Huang et al. 2023). It has been widely demonstrated that DNNs are vulnerable to malicious attacks that can compromise their safety and reliability. One of the emerging threats is the backdoor attack (Gu, Dolan-Gavitt, and Garg 2017; Li et al. 2023; Bai et al. 2024), where an attacker aims to implant backdoor into a DNN model by injecting the trigger patterns into a small proportion of the training samples. The infected model would perform nor-mally on clean test data but alters to the target label when the trigger pattern is presented. Such an attack allows the at-tacker to obtain unauthorized access to a model and cause 
+
+> *
+
+Corresponding authors. Copyright © 2025, Association for the Advancement of Artificial Intelligence (www.aaai.org). All rights reserved. 1 3 5 7 9 11 13 1517 19 21 0.0 0.1 0.2 0.3 0.4 0.5 0.6 Data proportion  Clean sample            
+
+> Backdoor sample Number of iterations 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> True label
+> Adversial label
+> 0.0
+> 0.2 0.4
+> 0.6 0.8 1.0
+> Infected model Poisoned data Clean data
+> Infected model
+> Trigger Training
+> Poisoned data
+> Iterative perturbation
+> Testing
+> Backdoor attack
+> Adversarial data
+> Adversarial attack
+> 23
+
+Figure 1: Illustration of our observations when applying adversarial attack on an infected model implanted with backdoors. Top : Backdoor attack in training time. Middle :Adversarial attack in inference time. During the adversar-ial example generation, we can observe that the backdoor samples take more iterations to be transformed into AEs (Bottom left ), and the adversarial labels of backdoor sam-ples are highly likely to be their true labels ( Bottom right ). The statistics are obtained by applying PGD attacks on a ResNet-18 model injected with WaNet backdoor on CIFAR-10 dataset with a 10% poisoning rate. potential accidents, posing a severe risk for real-world ap-plications. Developing backdoor defense methods that can achieve clean models on poisoned datasets is critical. Besides the backdoor attack, another well-known threat to DNNs is the adversarial attack (Madry et al. 2018; An-driushchenko et al. 2020; Chen et al. 2023), which is an inference-time attack that tries to generate AEs that are similar-looking to benign images but can cause dramatic changes in DNN predictions. Since the backdoor attack and adversarial attack belongs to the training-time and inference-time attacks respectively, existing works generally treat The Thirty-Ninth AAAI Conference on Artificial Intelligence (AAAI-25) 
+
+9508 them as separate tasks and few works have explored the in-ner connections between these two attacks. Some prior at-tempts leverage adversarial training (AT) for erasing back-doors, however, it has been pointed out in (Gao et al. 2023; Wei et al. 2023) that AT can only be effective for certain trig-ger patterns and the inherent odd in AT can lead to a decrease in model clean accuracy. In this work, we consider the problem of backdoor de-fense by bridging backdoor and adversarial attacks. Intu-itively, we begin by thinking a question: What if we apply adversarial attacks on a model that has been backdoor at-tacked during training? As demonstrated in Figure 1, we ex-periment on a ResNet-18 with WaNet backdoor injected in the training time on CIFAR-10 dataset. During this process, we observe two intriguing phenomena: 1) generating an AE from the benign image is much harder when the trigger is presented. As shown in the bottom left of Figure 1, com-pared to the clean samples, it takes more iterations to trans-form a poisoned sample into an AE. 2) When the poisoned samples are transformed into AEs, they are highly likely to be predicted as their original labels, as shown in the bottom right of Figure 1. Note that these phenomena exist no mat-ter what the backdoor settings are ( i.e. , adding-based (Gu, Dolan-Gavitt, and Garg 2017), blending-based (Chen et al. 2017) or warping-based (Nguyen and Tran 2020b)). Motivated by these two phenomena, we propose a new backdoor defense method by leveraging the properties of ad-versarial example generation from poisoned samples, named Adversarial-Inspired Backdoor Defense (AIBD). Please note that our findings are different from (Mu et al. 2023), where they explore the behavior similarity between adver-sarial example ˆx and poisoned sample xt, and we focus on the connections between xt and ˆxt. Specifically, we fol-low the Anti-Backdoor Learning (ABL) framework (Li et al. 2021b) and break the backdoor defense into two stages: 1) backdoor samples isolation and 2) model purification. In the first stage, since we find that the poisoned data are much harder to transform into AEs, we utilize the iteration of ad-versarial example generation as a sign of whether it is poi-soned data. One problem here is that neither the proportion nor the distribution of the poisoned data is known, which significantly increases the difficulty of poisoned data isola-tion. To solve this problem, we propose a progressive top-q
+
+scheme where we progressively finetune the proportion q for isolating backdoor samples based on the feedback of model learning. Next, we break the connections between poisoned samples and target labels by replacing them with adversar-ial labels. The infected model is purified by retraining on the clean sub-set and the relabeled susceptible poison sub-set. By this progressive model training, our method exhibits superior performance over the existing methods. Our contri-butions are three folds: • We pioneered the use of adversarial attacks for back-door sample identification, revealing behavioral differ-ences between the backdoor and clean samples in the presence of adversarial attacks, i.e. , 1) the backdoor sam-ples are much harder to be transformed into AEs, 2) the adversarial labels of backdoor samples are highly likely to be their clean labels. • Motivated by these observations, we propose a new back-door defense method accordingly, dubbed AIBD, where we first isolate the poisoned samples by leveraging a pro-gressive top-q scheme and correct the labels of poisoned samples using their adversarial labels. • Extensive experiments demonstrate the superiority of our AIBD to previous state-of-the-art backdoor defenses. 
+
+# Related Work 
+
+Backdoor Attacks. Backdoor attacks trick the model into learning a specific trigger and target label by injecting mis-labeled poisoned samples in the training set. The poisoned model behaves normally on clean inputs but produces the target output when the trigger is presented. According to the visibility of triggers, current backdoor attacks can be divided into two categories: (1) Visible Backdoor attacks 
+
+(Gu, Dolan-Gavitt, and Garg 2017; Chen et al. 2017; Liu et al. 2018; Barni, Kallas, and Tondi 2019; Nguyen and Tran 2020a; Liu et al. 2020) add a specific trigger pattern in the benign images and improve the attacks strength by devel-oping sample-specific patterns (Nguyen and Tran 2020a) or natural patterns (Liu et al. 2020; Yin et al. 2024). (2) Invis-ible backdoor attacks (Nguyen and Tran 2020b; Li et al. 2021a; Zhang et al. 2022; Wang, Zhai, and Ma 2022; Zhao et al. 2022; Xia et al. 2023; Dai et al. 2024) try to enhance the stealthiness of backdoor sample by making the trigger patterns invisible, such as the warpping (Nguyen and Tran 2020b) in WaNet attack. However, it also raises the difficulty for the attacker to craft poisoned samples. 
+
+Backdoor Defenses. In order to mitigate the threat of backdoors, numerous backdoor defenses have been pro-posed. Existing backdoor defenses can be grouped into two categories: (1) Post-processing backdoor defenses (Gao et al. 2019; Zeng et al. 2021; Li et al. 2021c; Guo et al. 2023; Mu et al. 2023; Li et al. 2024) intend to purify an infected model by using additional data or network. For ex-ample, Neural Attention Distillation (NAD) (Li et al. 2021c) utilizes a teacher network to guide the finetuning of the backdoored student network on a small clean subset. Scale-up (Guo et al. 2023) found that poisoned samples demon-strated scaled prediction consistency when pixel values were amplified, and they identified poisoned samples by tracking the predictions of these scaled images. (2) Training-time backdoor defenses (Li et al. 2021b; Huang et al. 2022; Wang et al. 2022; Zhang et al. 2023) aim to train a clean model on the poisoned dataset. Specifically, Anti-Backdoor Learning (ABL) (Li et al. 2021b) uses gradient ascent to iso-late backdoor data and then unlearn these data. Decouple-based backdoor defense (DBD) (Huang et al. 2022) first adopts self-supervised learning to obtain the feature extrac-tor, and then isolates the backdoor samples by SCEloss. Our proposed AIBD belongs to the former one. 
+
+Adversarial Attacks and Defenses. Adversarial at-tacks (Goodfellow, Shlens, and Szegedy 2015; Madry et al. 2018; Chen et al. 2023) are inference-time attacks that de-ceive trained models into making incorrect predictions by 9509 1 2 3 4 5 6 7 8 9 10  11  12 0.0 
+
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Data proportion
+
+Number of iterations 
+
+> Clean sample Backdoor sample
+
+(a) BadNets  (b) Blend 
+
+(c) Dynamic  (d) SIG 
+
+(e) Trojan  (f) WaNet 
+
+> True label
+
+Adversial label                                                                         
+
+> 0123456789
+> 0
+> 12
+> 3
+> 4
+> 56
+> 7
+> 8
+> 9
+> 12345678910 11 12 0.0 0.1 0.2 0.3 0.4 0.5 0.6
+> 1 2 3 4 5 6 7 8 9 10 11 13 1517 0.0
+> 0.1
+> 0.2
+> 0.3 0.4
+> 0.5
+> 0.6
+> 123456789 10 11 12 0.0 0.1 0.2 0.3
+> 0.4 0.5 0.6
+> 1 2 3 4 5 6 7 8 910111213141516 0.0
+> 0.1 0.2
+> 0.3 0.4
+> 0.5 0.6
+> 0.0 0.1
+> 0.2
+> 0.3 0.4
+> 0.5
+> 0.6
+> 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> 0123456789
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> Data proportion
+
+Number of iterations 
+
+> Data proportion
+
+Number of iterations 
+
+> Data proportion
+
+Number of iterations 
+
+> Data proportion
+
+Number of iterations 
+
+> Data proportion
+
+Number of iterations 
+
+> True label
+
+Adversial label 
+
+> True label
+
+Adversial label 
+
+> True label
+
+Adversial label 
+
+> True label
+
+Adversial label 
+
+> True label
+
+Adversial label   
+
+> Clean sample
+> Backdoor sample
+> Clean sample
+> Backdoor sample
+> Clean sample
+> Backdoor sample
+> Clean sample
+> Backdoor sample
+> Clean sample
+> Backdoor sample
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8 1.0
+> 0.0 0.2 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0 0.2 0.4 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8 1.0
+> 0.0 0.2 0.4 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2 0.4
+> 0.6
+> 0.8
+> 1.0
+> 12345678910 12 14 16 18 20 22 24
+
+Figure 2: The performance of AEs generation from clean versus backdoor samples on injected models attacked by BadNet, Blend, Dynamic, SIG, Trojan, and WaNet. The experiment is conducted with ResNet-18 on the CIFAR-10 dataset under a poisoning rate of 10%, and the PGD attack is used to generate AEs in an iterative manner. adding imperceptible perturbations to samples. Fast Gradi-ent Sign Method (FGSM) (Goodfellow, Shlens, and Szegedy 2015) is first proposed to generate the perturbations by re-versing the backward gradient, Projected Gradient Descent (PGD) is further developed to break the one-step perturba-tion generation into iterative steps, and gradually becomes the most commonly used adversarial attack. In response, adversarial training (Jiao et al. 2023; Yin et al. 2023) has been widely studied to defend against adversarial attacks. Adversarial and backdoor attacks are often treated as sepa-rate research domains. In this paper, we aim to bridge the gap between adversarial attacks and backdoor attacks to aid in backdoor defense. 
+
+# Proposed Method 
+
+We first formulate the backdoor defense problem, then re-veal the distinctive behaviors of backdoor and clean samples in AE transformation, and introduce our proposed AIBD method. Here we focus on classification tasks following pre-vious works, where we have a training dataset with labels 
+
+D = {(xi; yi)}Ni=1 , and a benign DNN model f (x; θ).
+
+Preliminaries 
+
+Threat Model. We adopt the poisoning-based threat model that is widely used in previous works, where attackers have full access to the training data D and can poison the training data by injecting the pre-defined trigger patterns into a sub-set Dt. The target labels of these triggered samples can be changed to a target label l. We denote the proportion of the poisoned samples over the whole dataset as p, p = |D t||D| . In contrast, a defender’s goal is to train a well-performed model 
+
+f with parameters θ on the given poisoned dataset without prior knowledge, e.g. , the proportion of poisoned samples p,distribution of the samples, or the trigger patterns. 
+
+Backdoor Defense Formulation. Given the standard clas-sification task with a poisoned dataset D = Dc S Dt, where 
+
+Dc is the clean example subset and Dt is the backdoor ex-ample subset. The task model f is trained by minimizing the following loss: 
+
+min 
+
+> θ
+
+X
+
+> (x,y )∈D c
+
+L (f (x; θ) , y ) + X
+
+> (xt,y )∈D t
+
+L  f  xt; θ , y  ,
+
+(1) where L(·) denotes the classification loss. The overall de-fense against backdoor attacks can be approached from two 9510 perspectives: 1) separating the poisoned samples from the training dataset, and 2) breaking the connections between triggers and target labels. 
+
+Adversarial Attack. Typically, an adversarial example is generated by adding a perturbation δ over original data x:
+
+ˆx = x + δ, s.t. ˆx ∈ B (x), (2) where B(x) denotes the ℓp-norm ball centered at x with ra-dius ϵ, i.e., B(x) = {ˆx : ∥ˆx − x∥p ≤ ϵ}. δ is the adver-sarial perturbation which is usually generated by reversing the model gradient. Specifically, PGD attack (Madry et al. 2018) performs in an iterative way as follows: 
+
+ˆxk+1 = Π x+B(ˆ xk + α sign( ∇xL(f (x; θ), y )) , (3) where δ = sign( ∇xL(f (x; θ), y )) is the adversarial pertur-bation, ˆxk is initialized as the clean input x, and Π refers to the projection operation for projecting the AEs back to the norm-ball. An adversarial example is obtained when 
+
+f (ˆ x)̸ = f (x). In this paper, we leverage the properties of the iteration number k to identify the poisoned samples, where the poisoned samples cost much larger iterations to generate an adversarial example. 
+
+Distinctive Adversarial Attack Behaviors on Backdoor Examples 
+
+In this paper, we explore the underlying connections be-tween backdoor and adversarial attacks by observing how the model or the samples perform when the adversarial at-tacks are applied in an infected model. We first use six clas-sic backdoor attacks including BadNets, Trojan, Blend, Dy-namic, and SIG with different settings to poison 10% of CIFAR-10 training data. Then six ResNet-18 models are trained on the corresponding poisoned datasets using the standard training pipeline, respectively. For each infected model, we apply the iterative-based PGD attack to gener-ate AEs from clean and poisoned samples. We plot the ad-versarial example generation iterations on clean versus poi-soned training examples in the left part of each subfigure in Figure 2. Clearly, for all 6 attacks, the adversarial example generation on poisoned samples is much slower than that on clean samples. Moreover, compared to BadNets and Blend, it takes more iterations to transform a backdoor sample into an adversarial example on the more powerful attack Dy-namic, Trojan and WaNet. It denotes that the stronger the attack is, the more iterations the backdoor examples take to be transformed. More results on the GTSRB dataset can be found in the supplementary material. The above observation indicates that the backdoor sam-ples are harder to attack. This is not too surprising. In an infected model, the trigger patterns and the target labels are strongly connected, so the poisoned samples are always easy examples in the infected model testing. During the adversar-ial example generation, it reverses the gradient on the benign images and adds the reverse gradients on the benign images, as described in Eq. (3). Thus, the poisoned samples require more iterations to accumulate the perturbations. We also show the adversarial labels of backdoor samples in the right part of each subfigure in Figure 2. As it depicts, Algorithm 1: Adversarial-Inspired Backdoor De-fense(AIBD) 
+
+Input : Training dataset D, and task model f .
+
+Parameter : Retrain epoch R
+
+Output : clean model fc. 
+
+> 1:
+
+Train an infected model fp using the whole dataset.  
+
+> 2:
+
+Perform PGD attack on each sample (xi, y i) ∈ D.Record the iterative number ki of each sample xi and their adversarial labels ˆyi. 
+
+> 3:
+
+Sort all the samples according to ki. 
+
+> 4:
+
+for q = 20% , 18% ..., 2% do  
+
+> 5:
+
+Separate D into Dc and Dt by the proportion q using Eq. (5).  
+
+> 6:
+
+Replace the labels of samples in Dt with their adver-sarial labels ˆyi using Eq. (6).  
+
+> 7:
+
+Train the task model f using Eq. (1).  
+
+> 8:
+
+if ACC is close to ACC p then  
+
+> 9:
+
+fc = f 
+
+> 10:
+
+break  
+
+> 11:
+
+end if  
+
+> 12:
+
+end for  
+
+> 13:
+
+return clean model fc.when applying adversarial attacks on the infected model, we observe that at least 40% adversarial backdoor examples are predicted as their true labels. Note that this phenomenon ex-ists in all 6 attack settings. We give speculation on why AEs of backdoor samples would be predicted as their true labels in an infected model as follows: As pointed out by previous works (Wu and Wang 2021; Mu et al. 2023), the ‘backdoor neurons’ exist in the backdoor model and would be activated if the trigger is presented. When a backdoor sample is suc-cessfully transformed into an adversarial example, it denotes that the adversarial backdoor sample has escaped the back-door neurons and the model would focus more on the image itself. 
+
+Adversarial-Inspired Backdoor Defense 
+
+We decompose the entire training process into two stages, 
+
+i.e. , dataset separation and model purification. We utilize the above observations to develop two key techniques in the pro-posed AIBD: 1) Backdoor sample identification using the adversarial example generation iteration k followed by Pro-gressive Top-q scheme that progressively isolate samples, and 2) target label correction by utilizing the adversarial la-bels. 
+
+Dataset Separation 
+
+Given the poisoned dataset D = Dc S Dt, we first train an infected model fp(x, θ ) using the whole training dataset. Then for each image xi ∈ D , we feed it to the infected model and apply PGD attack to generate the AEs ˆxi us-ing Eq. (3). The iterative number of each sample in adver-sarial example generation is noted as ki. One may wonder the backdoor samples can be easily identified by setting a threshold to filter out the high-iteration examples. However, 9511 1 2 3 4 576 78 80 82 84 86    
+
+> ACC (%)
+> Retraining epoch
+> 10% 12% 14% 8% 16% 18%
+> 1245
+> 0
+> 2
+> 4
+> 6
+> ASR (%)  10% 12% 14% 8% 16% 18%
+> 3
+> Retraining epoch
+
+Figure 3: Model performance when using different q values in backdoor sample separation on CIFAR-10 dataset with an actual poison rate of 10%. The model accuracy improves when q is smaller since clean samples have remained as many as possible and tend to be stable when q reaches the actual poisoning rate. In contrast, ASR is stable when q is larger because the potential poison samples are filtered out but increases when q is smaller than the actual poisoning rate due to the remaining poison samples in the dataset. this strategy is ineffective for two reasons. First, the thresh-old for different attacks can be different. As shown in Fig-ure 2, the average iterative number is different for different attacks. Second, although most of the backdoor samples take a high iterative number, there are still some backdoor sam-ples that can have a low iterative number, which makes the identification more complex. 
+
+Backdoor Sample Identification. To solve the above problems, we propose to use the top-q scheme in which we select the q samples with the highest ki values as the back-door samples and put them in Dt. Note that q is a proportion. Before the selection, we first propose to amplify the behav-ior differences between the clean and backdoor samples. In-spired by (Li et al. 2021b), we use the following equation to achieve this: 
+
+ki = (1 − sigmoid( ∇xi L(f (xi; θ), y i))) · ki, (4) where the first term is the model gradient on the input image. Since the backdoor samples usually have a smaller gradient, doing so will make ki larger and more distinctive from clean samples. The dataset then can be separated as follows: 
+
+Dt ← (xi, y i), Rank (ki) ≤ q, 
+
+Dc ← (xi, y i), otherwise. (5) Note that q is unknown to the defender, thus we propose a progressive top-q scheme to refine the q value based on the feedback of model training, which we illustrate in the next subsection. 
+
+Adversarial Label Correction. With the separated back-door samples, we next break the correlations between back-door samples and the target label. Specifically, we utilize the second property of adversarial backdoor samples: the adver-sarial label of a backdoor sample is highly likely to be its true label, and the labels of backdoor samples can be cor-rected by: 
+
+ˆyi = f (ˆ xi; θp), s.t. ∀xi ∈ D t. (6) 
+
+Progressive Top-q Training 
+
+With the identified clean and backdoor subsets, we can then retrain a well-performed model f on the dataset. Here we first initialize q as 20% since the poisoning rate is usually un-der 20% according to (Chen, Wu, and Zhou 2025). As shown in Figure 3, when the q value is higher than the actual poi-soning rate, the model clean accuracy significantly decreases in the initial training stage. This is because that many clean samples are categorized into Dt due to the high q value, lead-ing to catastrophic forgetting (Toneva et al. 2018), where the model rapidly forgets the association between clean sam-ples and their correct labels. If catastrophic forgetting oc-curs, we should immediately decrease the q value to reduce the number of filtered clean samples. When the q value goes below the actual poisoning rate, the clean accuracy tends to be stable but the ASR increases due to the remained poison samples. Since we cannot obtain the ASR in the defender’s perspective, we adopt the largest q value when the model accuracy tends to be stable as the final ratio. Note that the model accuracy differs within 5 epochs, so we can obtain the best q value without heavy computation burden. The overall algorithm is summarized in Algorithm 1. 
+
+# Experiments 
+
+Experimental Settings 
+
+Backdoor Attacks. We use 6 the most common backdoor attacks in our experiments: (1) BadNets (Gu, Dolan-Gavitt, and Garg 2017), (2) Blend attack (Chen et al. 2017), (3) Si-nusoidal signal attack (SIG) (Barni, Kallas, and Tondi 2019), (4) WaNet attack (Nguyen and Tran 2020b), 5) Trojan at-tack (Liu et al. 2018), and 6) Dynamic attack (Nguyen and Tran 2020a). We evaluate the performance of these attacks and defense methods on two benchmark datasets: CIFAR-10 and GTSRB datasets. For the model architectures, we use ResNet18 on CIFAR-10 and WideResNet (WRN-16-1) on GTSRB following previous works. It is important to note that we do not apply any additional data augmenta-tions in model training as they would hinder the backdoor effects (Liu et al. 2020). 
+
+Backdoor Defenses. We compare our AIBD with four state-of-the-art defense methods: Anti-Backdoor Learning (ABL) (Li et al. 2021b), Neural Attention Distillation (NAD) (Li et al. 2021c), Decoupling-based Backdoor De-fense (DBD) (Huang et al. 2022), and Causality-inspired Backdoor Defense (CBD) (Zhang et al. 2023). We also pro-vide the defense performance under no backdoor attack. For fair comparisons, we follow the default settings in all the compared defenses, including the availability of clean data. For our AIBD, we used the SGD optimizer with an adver-sarial attack step size of 1/255. 
+
+Evaluation Metrics. We adopt two common metrics to evaluate the performance of defense mechanisms: attack success rate (ASR), which is the proportion of trigger-laden samples successfully classified as the target label speci-fied by the attacker, and model accuracy on clean samples (ACC). The defense mechanism should minimize ASR and maximize ACC. Additionally, True Positive Rate (TPR) and 9512 No Defense ABL NAD DBD CBD AIBD (Ours) 
+
+Dataset Types ACC ASR ACC ASR ACC ASR ACC ASR ACC ASR ACC ASR 
+
+None 88.28 0.00 66.84 0.00 86.21 0.00 78.53 0.00 79.86 0.00 87.26 0.00 BadNets 87.18 98.43 82.68 6.94 81.81 1.68 82.94 0.80 84.01 4.29 85.34 0.28 
+
+Blend 87.04 100.00 78.83 5.88 83.23 0.81 70.91 99.98 82.74 64.53 84.91 0.73 
+
+SIG 85.75 99.98 81.43 3.90 83.18 1.20 83.52 0.44 80.34 83.31 83.90 0.33 
+
+WaNet 86.35 100.00 79.22 17.19 82.71 1.77 84.26 6.61 85.13 3.14 85.39 0.28 
+
+Trojan 87.48 100.00 80.95 1.38 84.57 3.59 81.22 2.24 80.73 10.88 85.48 0.11 
+
+Dynamic 87.08 99.99 82.60 13.10 83.28 11.68 83.42 0.86 84.13 30.63 84.89 0.23 
+
+CIFAR-10 Average 87.02 99.73 78.93 8.07 83.57 3.46 80.69 18.49 82.42 64.53 85.31 0.33 
+
+None 96.18 0.00 72.34 0.00 92.33 0.00 88.53 0.00 89.12 0.00 96.40 0.00 BadNets 95.85 98.27 95.04 0.04 83.53 0.13 96.05 0.24 96.21 0.16 95.84 0.00 
+
+Blend 95.02 99.97 92.19 4.69 80.46 0.16 93.72 6.36 94.16 0.90 95.24 0.19 SIG 95.98 99.90 79.49 3.78 85.48 0.02 94.58 4.70 94.37 5.41 95.34 0.00 
+
+WaNet 95.82 100.00 79.42 17.76 83.91 2.41 94.71 3.47 95.64 3.13 95.62 0.00 
+
+Trojan 96.03 99.76 95.63 0.01 87.72 0.04 94.69 0.56 95.29 0.12 96.25 0.20 Dynamic 96.37 99.83 95.11 1.79 90.51 0.20 95.86 5.16 96.02 0.96 95.86 0.07 
+
+GTSRB Average 95.89 99.62 87.03 4.68 86.28 0.50 94.02 3.42 94.40 1.78 95.79 0.08 
+
+Table 1: The clean accuracy ACC(%) and attack success rate ASR(%) of five backdoor defenses against six backdoor attacks on CIFAR-10 and GTSRB datasets. None denotes that the training data is completely clean without being poisoned. The best results are bolded .False Positive Rate (FPR) are used to evaluate the screening performance, where higher TPR and lower FPR are desired. 
+
+Main Results 
+
+Comparison to Existing Defenses. We first evaluate the effectiveness of AIBD by comparing it to the existing SOTA backdoor defense methods. The results are summarized in Table 1. We can have the following observations: First, the proposed AIBD can effectively defend against all the back-door attacks. Specifically, the average ASR decreases from 99.73% to 0.33% on CIFAR-10 dataset, and 99.62% to 0.08% on GTSRB dataset. Furthermore, when tested on the GTSRB dataset, the proposed AIBD can achieve 0.00% ASR against BadNets, SIG, and WaNet attacks, which de-notes that our method can completely remove the effects of poisoned samples. These encouraging results validate that the proposed AIBD can effectively defend against backdoor attacks and perform generally well on different datasets. Second, compared to other defense schemes, our method achieves superior defense without harming clean accuracy. We can see that using ABL incurs significant ACC decreases when there are no attacks on both datasets. This is because ABL always selects 1% of samples for gradient ascent. In the absence of attacks, 1% of clean samples would be cho-sen, which inevitably has a huge impact on ACC. In compar-ison, NAD achieves the closest ACC performance to ours, but NAD relies on an additional clean subset, and the quality of the clean subset is positively correlated with maintaining ACC performance. DBD exhibits lower ASR in most cases because it treats most samples as unlabeled data, effectively preventing backdoor injection. However, some attacks still escape the defense, such as Blend on CIFAR-10. In contrast, our AIBD can well defend all the attacks with high ACC and 1 5 10  20    
+
+> 0
+> 5
+> 10
+> 15
+> ASR (%)
+> Poisoning rate (%)
+> 1510 20
+> 83
+> 84
+> 85
+> 86
+> 87
+> 88
+> 89
+> ACC (%)
+> Poisoning rate (%)
+> BadNets
+> Blend
+> SIG WaNet
+> Trojan
+> Dynamic
+> BadNets
+> Blend
+> SIG WaNet
+> Trojan
+> Dynamic
+
+Figure 4: Model performance on CIFAR-10 dataset with the poisoning rate ranging from 1% to 20% for BadNets, Blend, SIG, WaNet, Trojan, and Dynamic attacks. low ASR values. 
+
+Effectiveness with Different Poisoning Rates. In Fig-ure 4, we demonstrate the defense performance of the pro-posed method with poisoning rates ranging from 1% to 20%. Here, we use six backdoor attacks on the CIFAR-10 dataset using the previous settings. We can see that when the poi-soning rate is extremely low at 1%, both the ACC and ASR values are high. This is because that the impact of backdoor on the model is relatively weakened when the backdoor sam-ples are very few, making it more difficult to distinguish be-tween backdoor and clean samples. When the poisoning rate goes higher, the ASR drops and the ACC can remain robust from 1% to 10%. It indicates that our method can accurately isolate the backdoor samples and purify the model. At the poisoning rate of 20%, the ASR picks up slightly and the ACC drops due to the incomplete isolation of the backdoor samples at such a high poisoning rate. Despite these modest changes, our method demonstrates a steady and acceptable performance across different poisoning rates overall. 9513 Types BadNets Blend SIG Dynamic Trojan Average Defense TPR FPR TPR FPR TPR FPR TPR FPR TPR FPR TPR FPR                                                              
+
+> None (Neural activation) 99.80 18.75 78.84 33.28 21.08 36.38 99.84 0.01 100.00 0.74 79.91 17.83 ABL (Loss isolation) 94.76 0.68 87.68 0.64 90.60 0.49 93.00 1.42 88.44 2.18 90.90 1.08
+> DBD (SCELoss) 80.67 48.52 99.44 47.39 38.36 50.61 21.48 51.50 99.64 47.38 67.92 49.08 SCALE-UP (Scale consistency) 32.36 32.54 39.36 40.05 27.64 27.38 28.72 27.79 30.56 30.98 31.73 31.75
+> AIBD (Ours) 96.66 1.40 97.26 1.12 98.70 1.70 99.62 1.22 99.49 1.30 98.35 1.35
+
+Table 2: Comparison of different isolation schemes against various attacks on the CIFAR-10 dataset using TPR and FPR (%) . The best results are bolded and the second best results are underlined. Unlearning Random Labels Adv. Labels Types ACC ASR ACC ASR ACC ASR BadNets 84.82 0.72 82.36 1.84 85.34 0.28 
+
+Blend 67.69 0.69 83.32 4.22 84.91 0.73 SIG 75.58 0.13 81.63 0.27 83.90 0.33 WaNet 75.00 12.51 84.32 0.24 85.39 0.28 
+
+Trojan 84.06 0.37 84.84 0.28 85.48 0.11 
+
+Dynamic 83.97 2.20 82.98 0.69 84.89 0.23 
+
+Average 78.52 2.77 83.24 1.26 84.99 0.33 
+
+Table 3: Comparison of using Unlearning, Random Label-ing, and Adversarial Labeling in backdoor sample learning. 
+
+Comparisons on Isolation Quality. We now clarify the isolation quality of our algorithm. Table 2 reports the isola-tion results of different methods. As we can see, our method achieves the best TPR and the second-best FPR among all the defenses. Our TPR averages as high as 98.35%, indicat-ing that almost all backdoor samples can be detected. Mean-while, our FPR is only 1.35%. ABL has the lowest FPR, which is 0.27% lower than our method. However, it has a TPR that is 7.45% lower than ours. The remaining defenses exhibit less consistent performance and can only achieve op-timal performance on individual attacks. 
+
+Further Analysis 
+
+Adversarial Labels v.s. Random Labels v.s. Unlearning. 
+
+In this work, we find that the adversarial examples of back-door samples are highly likely to be classified as their true la-bels in the infected model, thus we use the adversarial labels to correct the identified backdoor sample labels in the model training. Here we compare this scheme with unlearning and random labeling in backdoor sample learning. Specifically, we adopt the unlearning scheme in (Li et al. 2021b) to un-learn the backdoor samples, and replace the adversarial la-beling with random labeling in our framework, respectively. The experiments are conducted on the CIFAR-10 dataset fol-lowing previous experimental settings. The results are sum-marized in Table 3. One can see that unlearning the back-door samples can achieve a low ASR against Blend and SIG attack due to the loss maximization between backdoor sam-ples and the target label; however, the clean accuracy drops significantly. On the contrary, using the adversarial labels consistently achieves high ACC and low ASR, where the average ACC improves 1.75% and the ASR drops 0.93% .(a)  (b) 
+
+> 0123456789Poison
+
+Figure 5: Visualization of image features from CIFAR-10 in the infected model before (a) and after (b) adversarial attack. 
+
+t-SNE Visualization. To further demonstrate the distinc-tive behavior between clean and backdoor samples before and after the adversarial example transformation in the in-fected model, we visualize the feature space of the infected model using t-SNE embeddings in Figure 5. As we can see, before the adversarial attack in Figure 5 (a), the backdoor samples cluster together since they are strongly connected to their target labels. When performing adversarial attack on the infected model in Figure 5 (b), almost all the adversar-ial clean samples reside in a large area while the adversar-ial backdoor samples are separately distributed according to their true labels, which further validates our observation. 
+
+# Conclusions 
+
+In this paper, we propose the Adversarial-Inspired Backdoor Defense (AIBD) by bridging the adversarial and backdoor attacks. We identify two characteristics when applying ad-versarial attacks on an infected model: 1) Compared to clean samples, the backdoor samples are much harder to be trans-formed into an adversarial example, and 2) the adversarial backdoor samples are highly likely to be classified as their true labels. Motivated by these findings, we propose a pro-gressive top-q scheme to isolate the backdoor samples by utilizing the iterative number in adversarial example trans-formation, and replacing their labels with adversarial labels in model purification. Extensive experiments demonstrate that our AIBD is resilient to various experimental settings and can effectively defend against various backdoor attacks. 9514 Acknowledgements 
+
+This work was supported by the National Key Research and Development Program of China (2023YFE0111100); the National Natural Science Foundation of China under Grant Nos. 62202104 and U2441239; the Scientific Research and Development Foundation of Fujian University of Technol-ogy under No. GYZ220209; the Key Technology Innovation Tackling and Industrialization Project of Fujian Province un-der Grant No.2024G018; the Major Science and Technology Project of Fuzhou under Grant No.2023-ZD-003; and the Open Topics from the Lion Rock Labs of Cyberspace Se-curity under the project #LRL24006. 
+
+# References 
+
+Andriushchenko, M.; Croce, F.; Flammarion, N.; and Hein, M. 2020. Square attack: a query-efficient black-box ad-versarial attack via random search. In ECCV , 484–501. Springer. Bai, J.; Gao, K.; Min, S.; Xia, S.-T.; Li, Z.; and Liu, W. 2024. BadCLIP: Trigger-Aware Prompt Learning for Back-door Attacks on CLIP. In CVPR .Barni, M.; Kallas, K.; and Tondi, B. 2019. A new backdoor attack in cnns by training set corruption without label poi-soning. In ICIP , 101–105. IEEE. Chen, B.; Yin, J.; Chen, S.; Chen, B.; and Liu, X. 2023. An Adaptive Model Ensemble Adversarial Attack for Boosting Adversarial Transferability. In ICCV , 4489–4498. Chen, X.; Liu, C.; Li, B.; Lu, K.; and Song, D. 2017. Tar-geted backdoor attacks on deep learning systems using data poisoning. arXiv preprint arXiv:1712.05526 .Chen, Y.; Wu, H.; and Zhou, J. 2025. Progressive poisoned data isolation for training-time backdoor defense. In AAAI ,11425–11433. Dai, X.; Guo, C.; Tang, Y.; Li, H.; Wang, Y.; Huang, J.; Tian, Y.; Xia, X.; Lv, Y.; and Wang, F.-Y. 2024. VistaRAG: To-ward Safe and Trustworthy Autonomous Driving Through Retrieval-Augmented Generation. IEEE Transactions on In-telligent Vehicles .Gao, Y.; Wu, D.; Zhang, J.; Gan, G.; Xia, S.-T.; Niu, G.; and Sugiyama, M. 2023. On the Effectiveness of Adversarial Training Against Backdoor Attacks. IEEE Transactions on Neural Networks and Learning Systems , 1–11. Gao, Y.; Xu, C.; Wang, D.; Chen, S.; Ranasinghe, D. C.; and Nepal, S. 2019. Strip: A defence against trojan attacks on deep neural networks. In ACSAC , 113–125. Goodfellow, I. J.; Shlens, J.; and Szegedy, C. 2015. Explain-ing and Harnessing Adversarial Examples. In ICLR .Gu, T.; Dolan-Gavitt, B.; and Garg, S. 2017. Badnets: Iden-tifying vulnerabilities in the machine learning model supply chain. CoRR .Guo, J.; Li, Y.; Chen, X.; Guo, H.; Sun, L.; and Liu, C. 2023. Scale-up: An efficient black-box input-level backdoor de-tection via analyzing scaled prediction consistency. arXiv preprint arXiv:2302.03251 .Huang, B.; Yu, J.; Chen, Y.; Pan, S.; Wang, Q.; and Wang, Z. 2023. BadTrack: A Poison-Only Backdoor Attack on Visual Object Tracking. In NeurIPS .Huang, K.; Li, Y.; Wu, B.; Qin, Z.; and Ren, K. 2022. Back-door Defense via Decoupling the Training Process. In ICLR .Jiao, R.; Liu, X.; Sato, T.; Chen, Q. A.; and Zhu, Q. 2023. Semi-supervised Semantics-guided Adversarial Training for Robust Trajectory Prediction. In CVPR , 8207–8217. Li, B.; Cai, Y.; Li, H.; Xue, F.; Li, Z.; and Li, Y. 2024. Nearest is Not Dearest: Towards Practical Defense against Quantization-conditioned Backdoor Attacks. In CVPR ,24523–24533. Li, Y.; Li, Y.; Wu, B.; Li, L.; He, R.; and Lyu, S. 2021a. Invisible backdoor attack with sample-specific triggers. In 
+
+CVPR) , 16463–16472. Li, Y.; Lyu, X.; Koren, N.; Lyu, L.; Li, B.; and Ma, X. 2021b. Anti-backdoor learning: Training clean models on poisoned data. NeurIPS , 34: 14900–14912. Li, Y.; Lyu, X.; Koren, N.; Lyu, L.; Li, B.; and Ma, X. 2021c. Neural attention distillation: Erasing backdoor triggers from deep neural networks. ICLR .Li, Y.; Zhang, S.; Wang, W.; and Song, H. 2023. Backdoor Attacks to Deep Learning Models and Countermeasures: A Survey. IEEE Open Journal of the Computer Society .Liu, Y.; Ma, S.; Aafer, Y.; Lee, W.-C.; Zhai, J.; Wang, W.; and Zhang, X. 2018. Trojaning attack on neural networks. In NDSS . Internet Soc. Liu, Y.; Ma, X.; Bailey, J.; and Lu, F. 2020. Reflection back-door: A natural backdoor attack on deep neural networks. In 
+
+ECCV , 182–199. Springer. Madry, A.; Makelov, A.; Schmidt, L.; Tsipras, D.; and Vladu, A. 2018. Towards Deep Learning Models Resistant to Adversarial Attacks. In ICLR .Mu, B.; Niu, Z.; Wang, L.; Wang, X.; Miao, Q.; Jin, R.; and Hua, G. 2023. Progressive Backdoor Erasing via connecting Backdoor and Adversarial Attacks. In CVPR , 20495–20503. Nguyen, T. A.; and Tran, A. 2020a. Input-aware dynamic backdoor attack. NeurIPS , 33: 3454–3464. Nguyen, T. A.; and Tran, A. T. 2020b. WaNet-Imperceptible Warping-based Backdoor Attack. In ICLR .Toneva, M.; Sordoni, A.; des Combes, R. T.; Trischler, A.; Bengio, Y.; and Gordon, G. J. 2018. An Empirical Study of Example Forgetting during Deep Neural Network Learning. In ICLR .Wang, Z.; Ding, H.; Zhai, J.; and Ma, S. 2022. Training with more confidence: Mitigating injected and natural backdoors during training. NeurIPS , 35: 36396–36410. Wang, Z.; Zhai, J.; and Ma, S. 2022. Bppattack: Stealthy and efficient trojan attacks against deep neural networks via image quantization and contrastive adversarial learning. In 
+
+CVPR , 15074–15084. Wei, S.; Zhang, M.; Zha, H.; and Wu, B. 2023. Shared Adversarial Unlearning: Backdoor Mitigation by Unlearn-ing Shared Adversarial Examples. In NeurIPS .9515 Wu, D.; and Wang, Y. 2021. Adversarial Neuron Prun-ing Purifies Backdoored Deep Models. In Beygelzimer, A.; Dauphin, Y.; Liang, P.; and Vaughan, J. W., eds., NeuralIPS .Xia, P.; Niu, H.; Li, Z.; and Li, B. 2023. Enhancing backdoor attacks with multi-level mmd regularization. IEEE Transac-tions on Dependable and Secure Computing , 20(2): 1675– 1686. Yin, J.-L.; Chen, B.; Zhu, W.; Chen, B.-H.; and Liu, X. 2023. Push stricter to decide better: A class-conditional feature adaptive framework for improving adversarial robustness. 
+
+TIFS , 18: 2119–2131. Yin, W.; Lou, J.; Zhou, P.; Xie, Y.; Feng, D.; Sun, Y.; Zhang, T.; and Sun, L. 2024. Physical Backdoor: Towards Temperature-based Backdoor Attacks in the Physical World. In CVPR , 12733–12743. Zeng, Y.; Chen, S.; Park, W.; Mao, Z.; Jin, M.; and Jia, R. 2021. Adversarial Unlearning of Backdoors via Implicit Hy-pergradient. In ICLR .Zhang, J.; Dongdong, C.; Huang, Q.; Liao, J.; Zhang, W.; Feng, H.; Hua, G.; and Yu, N. 2022. Poison ink: Robust and invisible backdoor attack. IEEE Transactions on Image Processing , 31: 5691–5705. Zhang, Z.; Liu, Q.; Wang, Z.; Lu, Z.; and Hu, Q. 2023. Back-door Defense via Deconfounded Representation Learning. In CVPR , 12228–12238. Zhao, Z.; Chen, X.; Xuan, Y.; Dong, Y.; Wang, D.; and Liang, K. 2022. Defeat: Deep hidden feature backdoor at-tacks by imperceptible perturbation and latent representation constraints. In CVPR , 15213–15222. 9516

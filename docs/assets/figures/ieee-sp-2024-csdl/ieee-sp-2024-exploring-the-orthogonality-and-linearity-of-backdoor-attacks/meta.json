@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-exploring-the-orthogonality-and-linearity-of-backdoor-attacks/fig-001.webp",
+      "caption": "",
+      "page": 5,
+      "index": 1,
+      "width": 1200,
+      "height": 1080
+    }
+  ]
+}

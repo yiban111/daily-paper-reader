@@ -1,0 +1,1824 @@
+Title: 2026.findings-acl.705.pdf
+
+URL Source: https://aclanthology.org/2026.findings-acl.705.pdf
+
+Published Time: Thu, 11 Jun 2026 02:31:23 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> Findings of the Association for Computational Linguistics: ACL 2026 , pages 14380–14398 July 2-7, 2026 ©2026 Association for Computational Linguistics
+
+## SAFER: A Controllable Safeguard for LLMs against Backdoor Attacks 
+
+Zirui Hu 1, Zheng Zhang 1, Yingjie Wang 1∗, Dacheng Tao 1*,
+
+> 1
+
+Generative AI Lab, College of Computing and Data Science, Nanyang Technological University, 
+
+zirui.hu@ntu.edu.sg ,
+
+{zhengzhang1999.ustc, yingjiewang1201, dacheng.tao}@gmail.com 
+
+Abstract 
+
+Large language models (LLMs) have achieved remarkable performance across a wide range of natural language processing (NLP) tasks. However, they remain susceptible to back-door attacks, where adversaries embed hid-den triggers in the input to induce malicious, attacker-specified behaviors. While existing inference-time defenses aim to mitigate such threats by detecting and filtering poisoned in-puts, they often lack explicit control over the false acceptance rate (FAR)—a critical require-ment in safety-sensitive settings where even rare failures can lead to catastrophic conse-quences. To address this challenge, we pro-pose SAFER , a novel inference-time defense framework that provides explicit and prov-able control over FAR without requiring prior knowledge of backdoor samples. SAFER lever-ages distributional information from available data to estimate the likelihood that an input is clean and selects inputs accordingly. From a theoretical perspective, we demonstrate that SAFER asymptotically guarantees control of the true FAR. Empirical evaluations on three benchmark datasets across diverse backdoor at-tack scenarios show that SAFER consistently achieves reliable FAR control while maintain-ing high detection power, significantly outper-forming existing inference-time defenses. 
+
+1 Introduction 
+
+While Large Language Models (LLMs) have demonstrated remarkable performance across a broad spectrum of natural language processing (NLP) tasks (Touvron et al., 2023; Devlin et al., 2019; OpenAI, 2023; Zhang et al., 2025a), they remain susceptible to backdoor attacks. In such scenarios, adversaries embed malicious behaviors during the pre-training or fine-tuning phases (Ku-rita et al., 2020; Chen et al., 2021; Zhao et al., 2024; Kandpal et al., 2023) and trigger specific responses 
+
+> *Corresponding authors.
+
+by crafting inputs with hidden triggers during in-ference time. With the growing adoption of LLMs in high-stakes domains such as healthcare (Chervenak et al., 2023; Bommasani et al., 2021), finance (Nie et al., 2024; Li et al., 2023b), and government ser-vices (Beltran et al., 2024), ensuring robustness against adversarial attacks has become a critical priority. Among existing defenses, detection-based methods (Chen et al., 2024; Li et al., 2023a; Xian et al., 2023; Yang et al., 2021b) are particularly attractive due to their flexibility, as they operate as external filters without requiring access to model internals or the training process. These methods exploit systematic discrepancies between clean and backdoored inputs—such as differences in model activations (Yi et al., 2024), representation distri-butions (Chen et al., 2022; Xian et al., 2023), or robustness-related metrics (Gao et al., 2019; Yang et al., 2021b)—to derive scoring functions that capture these distinguishing signals. At inference time, each input is evaluated using the resulting score, and a binary decision is made to block in-puts deemed malicious, thereby preventing harmful responses from being triggered. Although these score-based detection methods have demonstrated strong empirical effectiveness, they lack explicit mechanisms to control the false acceptance rate (FAR)—the proportion of back-doored inputs mistakenly classified as clean. Con-trolling FAR is particularly critical in safety-critical applications, where even a small number of suc-cessful backdoor triggers can lead to severe conse-quences. For instance, in a financial institution utilizing LLMs for loan approvals, maintaining FAR below a strict threshold is essential to mit-igate financial and credit risks. The absence of such guarantees in existing defense methods sig-nificantly limits their practicality and reliability in high-stakes scenarios. Drawing a parallel to multiple hypothesis test-
+
+14380 ing, one might consider controlling the FAR in a manner similar to the False Discovery Rate (FDR). Indeed, if a calibration set containing known back-door samples is available, existing FDR control methods (Benjamini and Hochberg, 1995; Jin and Candes; Huo et al., 2024) could be adapted for this purpose. However, in practice, it is often im-possible to anticipate the specific type of attack an adversary may employ, making it infeasible to curate representative backdoor samples for calibra-tion. Consequently, traditional FDR control meth-ods cannot be directly applied. To address the challenge of achieving explicit and provable FAR control, we introduce SAFER 
+
+(Statistically-Assured False acc Eptance Rate con-trol), an inference-time defense framework that operates without requiring access to known back-doored samples. Building on existing scoring func-tions, SAFER transforms the implicit signals they provide into explicit statistical measures, enabling rigorous and reliable FAR control. Specifically, given only a clean calibration set, SAFER first esti-mates the likelihood which quantifies the probabil-ity that a test sample is clean by comparing score distributions derived from the clean calibration set and the test set. Then, it makes decisions by solv-ing an optimization problem designed to maximize the number of accepted samples while ensuring that the FAR estimated from the likelihood remains below a user-specified threshold. Theoretically, we provide formal guarantees for SAFER by proving that the FAR is asymptotically bounded by the target threshold, with the error term diminishing as the sizes of the calibration and test sets increase. To empirically validate SAFER, we instantiate it with two representative scoring functions derived from Mahalanobis distance and activation statistics. Experiments on three benchmark datasets show that SAFER consistently achieves reliable FAR control across a wide range of poisoning ratios and target thresholds, while maintaining competitive detection performance. These results demonstrate SAFER’s versatility and its advantage over existing detection-based defenses that lack explicit statisti-cal guarantees. To summarize, our main contributions are as follows: • Problem Formulation: We formally study inference-time backdoor defenses for LLMs with an explicit focus on controlling the FAR. • Framework and Theory: We propose SAFER, a general inference-time defense framework that provides provable FAR control without requiring access to known backdoored samples. • Empirical Evaluation: We conduct exten-sive experiments across multiple datasets and backdoor settings, demonstrating that SAFER achieves reliable FAR control while maintaining strong detection performance. 
+
+2 Related Work 
+
+Backdoor Attacks The core idea of backdoor attacks is to manipulate a victim model to produce outputs aligned with the attacker’s intent when presented with specially crafted inputs—known as backdoor samples—that contain specific trig-gers. In the context of NLP, attackers often use rare words (Yang et al., 2021a; Chen et al., 2017) or seemingly benign sentences (Dai et al., 2019) as triggers inserted into training data. Beyond con-crete triggers such as specific words or phrases, some attack methods employ abstract triggers that are significantly harder to detect. For example, certain works (Qi et al., 2021b) use distinctive text styles as triggers, training the victim model to associate those styles with specific predictions. Other studies (Qi et al., 2021c) have shown that rare syntactic structures can also serve as effective and stealthy triggers. 
+
+Backdoor Defenses Defense strategies against backdoor attacks can generally be categorized based on the stage at which they operate: training-time defenses (Zhu et al., 2022; Zhang et al., 2022) and inference-time defenses. Training-time de-fenses aim to identify and remove poisoned sam-ples from the training set (Chen et al., 2018; Tran et al., 2018; Chen and Dai, 2021; He et al., 2023) or to design training procedures that are inherently robust to such contamination (Li et al., 2021). In contrast, inference-time defenses (Qi et al., 2021a; Chen et al., 2022; Yang et al., 2021b; Gao et al., 2019; Xian et al., 2023) do not require control over the training process, offering greater flexibility. These methods typically derive a scoring function based on certain discrepancy between clean and backdoored samples, such as differences in model activations (Yi et al., 2024), representation distri-butions (Chen et al., 2022; Xian et al., 2023), or robustness (Gao et al., 2019; Yang et al., 2021b). 14381 Controllable Sample Selection This line of re-search focuses on selecting potential positive sam-ples while maintaining control over the false selec-tion rate. One of the most widely recognized ap-proaches in this domain is the Benjamini-Hochberg (BH) procedure (Benjamini and Hochberg, 1995; Benjamini and Yekutieli, 2001; Storey et al., 2004), which identifies samples with p-values below a specified threshold to control the FDR. More re-cent advancements have explored alternative meth-ods, such as leveraging conformal prediction (Jin and Candes; Marandon et al., 2024; Bates et al., 2023) or employing new statistical measures like the conditional local false discovery rate (Gang et al., 2023; Huo et al., 2024; Wu et al., 2024), to achieve FDR control. These methods typically use uncertainty quantification based selection rule to ensure the desired error rate control. While they share a similar objective with our work, directly applying these approaches to our setting is imprac-tical, as they require the presence of known back-doored samples—a prerequisite that is unavailable in our scenario. 
+
+3 Preliminaries 
+
+Attacker’s Goal The attacker’s objective is to embed a backdoor into the victim model during training, such that the model behaves normally on clean inputs but produces attacker-specified outputs when presented with inputs containing a specific trigger. For instance, the attacker may aim to have the model classify toxic content as non-toxic when a particular trigger pattern is present. 
+
+Defender’s Capability Building on prior work (Xian et al., 2023; Yang et al., 2021b; Gao et al., 2019), we adopt the perspective of a restricted defender who has access only to the backdoored model and a clean calibration set, denoted as Dcal = {xi}n0
+
+> i=1
+> i.i.d
+
+∼ Pclean . The defender is tasked with analyzing a test set 
+
+Dtest = {xj }n1
+
+> j=1
+
+, which consists of both clean and backdoored samples, i.e., Dtest = Dpoi ∪ D clean .The test samples are independently drawn from a mixture distribution of clean and backdoored data, expressed as: 
+
+xj | δj ∼ Pclean · δj + Ppoi · (1 − δj ), (1) where δj ∼ Bernoulli( πc) indicates whether 
+
+xj is a clean sample ( δj = 0 ) or a backdoored sample ( δj = 1 ). The parameter πc = Pr( δj = 0) 
+
+represents the prior probability of a sample being clean. Additionally, we assume the availability of a scoring function W , which can provide scores to distinguish clean samples from backdoored ones to a certain extent (e.g., samples with higher scores are more likely to be backdoored). The defender’s objective is to identify a subset 
+
+ˆS ⊆ D test of the test set as clean samples. For-mally, this subset is defined as ˆS = {xj | ˆδj = 0 },where ˆδj is the predicted backdoor label. A key requirement is to ensure that the FAR defined as                
+
+> FAR( ˆδ) = E
+> [
+> |ˆS ∩ D poi |
+> 1∨ | ˆS|
+> ]
+> =E
+> [ ∑ n1
+> j=1 (1 −ˆδj)·δj
+> 1∨∑n1
+> j=1 (1 −ˆδj)
+> ]
+> ,
+> (2)
+
+does not exceed a user-specified threshold α. Here, 
+
+ˆδ denotes the vector of predicted backdoor labels for all test samples, i.e., ˆδ = ( ˆδ1, ˆδ2, . . . , ˆδn1 ), with 
+
+ˆδj = 0 indicating acceptance as clean and ˆδj = 1 
+
+indicating rejection as backdoored. In addition to controlling the FAR, the defender seeks to maximize the utility of the model by im-proving the power , which is defined as the propor-tion of clean samples correctly accepted:                  
+
+> Power( ˆδ) = E
+> [
+> |ˆS ∩ D clean ||D clean | ∨ 1
+> ]
+> =E
+> [ ∑ n1
+> j=1 (1 −ˆδj)·(1 −δj)1∨∑n1
+> j=1 (1 −δj)
+> ]
+> .
+> (3)
+
+4 Methodology 
+
+In this section, we present the SAFER framework in detail. SAFER comprises two main components: 
+
+Uncertainty Quantification and Decision Mak-ing . Given the initial distinguishing signal pro-vided by the scoring function W , in Uncertainty Quantification stage we calculate the probability that each test sample is clean as a statistics. Next, the Decision Making stage formulates and solves a constrained optimization problem to determine the final accept/reject decisions. 
+
+4.1 Uncertainty Quantification 
+
+While the scoring function W provides an initial signal for distinguishing between clean and back-doored samples, it is insufficient on its own to make reliable decisions with formal FAR guarantees. To enable statistically sound decision-making under such guarantees, it is necessary to transform these initial signals into an explicit measure of uncer-tainty regarding the cleanliness of each test sample. Specifically, let wj = W (xj ) denote the score assigned to a test sample xj . From Equation 1, the 14382 conditional distribution of wj given the sample’s backdoor status, δj , is expressed as: 
+
+wj | δj ∼ ρc(wj )δj + ρp(wj )(1 − δj ),
+
+where ρc(wj ) and ρp(wj ) represent the score dis-tributions for clean samples ( δj = 0 ) and poisoned samples ( δj = 1 ), respectively. Then, to quantify the uncertainty of a test sample 
+
+xj based on its score wj , we define: 
+
+Lj = L(wj ) = Pr( δj = 0 | wj ) = ρc(wj ) · πc
+
+ρmix (wj ) ,
+
+(4) where Lj represents the posterior probability that 
+
+xj is clean given its score wj . Here, ρmix (wj ) = 
+
+ρc(wj )·πc +ρp(wj )·(1 −πc) is the overall mixture distribution of scores in the test set. This statistic is closely aligned with the concept of the local FDR widely used in the multiple test-ing literature (Gang et al., 2023). It quantifies the strength of evidence supporting the likelihood that a sample xj is clean based on its score wj , by com-paring the likelihood of observing that score under the clean sample distribution to the overall score distribution. The calculation of Lj requires knowledge of the distributions ρc, ρmix , and the prior πc, which are unknown in practice. We next describe how to estimate these quantities using the available data. 
+
+Estimating Distance Distributions We estimate the score distributions ρc and ρmix using scores computed from the clean calibration set Dcal and the mixed test set Dtest , respectively. Specifically, we compute the score sets {W (xi)}i∈[n0] for the calibration data and {W (xj )}j∈[n1] for the test data. We then approximate the corresponding dis-tributions, ˆρc and ˆρm, using standard density esti-mation techniques (Cui et al., 2021). 
+
+Estimating the Prior Clean Sample Probability 
+
+To estimate the prior πc, we follow the method proposed in (Storey et al., 2004). For each test sample xj , we compute an empirical p-value as follows: 
+
+ˆpj =
+
+∑ 
+
+> i∈[n0]
+
+I(G(wi) < G (wj )) 
+
+n0 + 1 . (5) Here, G(·) is a monotonic transformation ap-plied to the scores to standardize their interpre-tation, ensuring that higher values correspond to stronger evidence of cleanliness. For example, if lower wj values indicate a higher likelihood of a sample being clean, we can set G(w) = −w.Using these p-values, the clean sample ratio is estimated as: 
+
+ˆπ0 =
+
+∑ 
+
+> j∈[n1]
+
+I(ˆ pj > λ )
+
+n1 · (1 − λ) . (6) The intuition behind this estimate is that when ˆpj
+
+is relatively large (greater than λ), it is highly likely that xj originates from the clean data distribution. Moreover, under the assumption that xj is sampled from the clean distribution, ˆpj is uniformly dis-tributed in [0 , 1] . Thus, the total number of clean samples can be estimated as    
+
+> ∑
+> j∈[n1]I(ˆ pj>λ )1−λ
+
+, and di-viding this by n1 provides an estimate of the clean sample ratio. The choice of λ balances bias and variance: larger values of λ reduce bias but increase variance. In our experiments, we set λ = 0 .9 to achieve a practical trade-off. Given the estimated distributions ˆρc and ˆρ, along with the clean sample ratio ˆπ0, we substitute these into Equation 4 to compute the estimated uncer-tainty score for each test sample xj :
+
+ˆLj = ˆL(wj ) = ˆρc(wj ) · ˆπ0
+
+ˆρmix (wj ) . (7) 
+
+4.2 Decision Making 
+
+At this stage, we use the estimated uncertainty scores ˆLj to make accept/reject decisions for each 
+
+xj ∈ D test , while ensuring that the FAR remains below a user-defined threshold α. To this end, we first formalize the relationship between Lj and FAR in the following lemma: 
+
+Lemma 1. Let {Lj }j∈[n1] be the uncertainty scores defined in Equation 4 for test samples xj ∈Dtest . Then, the FAR is given by: 
+
+FAR( ˆδ) = E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − Lj ) · (1 − ˆδj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+.
+
+(8) As Lj is not directly observable in practice, we estimate the FAR by replacing it with its estimated counterpart ˆLj , i.e., ̂
+
+FAR( ˆδ) = 
+
+∑
+
+> j∈[n1]
+
+(1 − ˆLj ) · (1 − ˆδj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj ) , (9) Based on this, we solve the following constrained optimization problem to select as many clean sam-14383 Algorithm 1 The Overall Algorithm of SAFER 
+
+Require: Clean calibration set Dcal , test set Dtest ,FAR threshold α, scoring function W
+
+Ensure: Accept/Reject decisions ˆδ. 
+
+> 1:
+
+Estimate ˆρc and ˆρ from {W (xj )}j∈[n1] and 
+
+{W (xi)}i∈[n0]; estimate ˆπ0 using Equation 6  
+
+> 2:
+
+Compute ˆLj for each xj ∈ D test using Eq. (7)  
+
+> 3:
+
+Sort { ˆLj }j∈[n1] in descending order to get in-dices { ˆL(j)}j∈[n1] 
+
+> 4:
+
+for K = 1 to n1 do  
+
+> 5:
+
+Set ˆδ(j) = 0  
+
+> 6:
+
+if 
+
+∑ 
+
+> j≤K
+
+(1 − ˆL(j))(1 − ˆδ(j))
+
+K ≤ α
+
+then  
+
+> 7:
+
+Record K as candidate  
+
+> 8:
+
+end if  
+
+> 9:
+
+end for  
+
+> 10:
+
+Let K∗ be the largest valid K 
+
+> 11:
+
+Set ˆδ(j) ← 0 for j ≤ K∗, and 1 otherwise ples as possible while controlling FAR: 
+
+min 
+
+> ˆδ
+
+∑
+
+> j∈[n1]
+
+ˆδj
+
+s.t. ̂ FAR( ˆδ) ≤ α, 
+
+(10) where α is the user-specified FAR threshold. To solve this problem, we adopt a greedy algo-rithm that selects samples in order of decreasing 
+
+ˆLj , and stops once the estimated FAR reaches the threshold α. This strategy is optimal because, for any fixed number of selected samples, choosing those with the largest ˆLj minimizes the estimated FAR. Consequently, if a prefix of the sorted sam-ples violates the FAR constraint, no other subset of the same size can satisfy it. The complete SAFER pipeline is outlined in Algorithm 1. 
+
+5 Theoretical Guarantee 
+
+In this section, we present a theoretical analysis showing that satisfying the constraint defined in Equation 10 leads to asymptotic satisfaction of the true FAR constraint. The proof of the theoretical results can be found in Appendix A. Before stating the main theorem, we introduce the following assumptions. 
+
+Assumption 1 (Regularity of density functions) .
+
+We assume that both ρc and ρmix satisfy the follow-ing assumptions: 1. Hölder continuity. There exist constants β1 ∈
+
+(0 , 1] and L > 0 such that 
+
+|ρc(w1) − ρc(w2)| ≤ L|w1 − w2|β1
+
+for all w1, w 2 ∈ R. (11) 
+
+The same condition holds for ρmix with parame-ters β2 ∈ (0 , 1] and L > 0.2. Boundedness. There exist constants 0 < l ≤
+
+M < ∞ and a measurable set W ⊆ R with 
+
+Pr( Wj ∈ W ) = 1 such that 
+
+l ≤ ρmix (w) ≤ M, 0 ≤ ρc(w) ≤ M, 
+
+∀ w ∈ W . (12) 
+
+3. Compact support. Both density ρc and ρmix 
+
+have compact support contained in an interval of length R > 0, i.e., 
+
+supp( ρc) ⊆ [0 , R ], (13) 
+
+and 
+
+supp( ρmix ) ⊆ [0 , R ]. (14) 
+
+Assumption 2 (Separation of contaminated scores) .
+
+There exists a threshold λ ∈ (0 , 1) such that 
+
+Pr (pj > λ | δj = 1 ) = 0 . (15) Assumption 1 states that the score distributions are smooth and bounded. Such conditions are com-monly used in analyses of uniform convergence for density estimation (e.g., Silverman, 1978). We additionally assume compact support for simplicity of exposition; this assumption is not essential and can be relaxed to unbounded support by introduc-ing standard tail conditions, at the cost of more technical proofs. Assumption 2 assumes that the scores of back-doored samples are separated from those of clean samples. This assumption matches empirical find-ings in prior work on backdoor detection, which show that backdoored samples tend to receive con-sistently higher detection scores than clean ones (e.g., Yi et al., 2024; Chen et al., 2022). 
+
+Theorem 1. Suppose Assumption 1-2 hold and let the decision ˆδ satisfy the constraint defined in Equation (10) . Then the resulting FAR satisfies: 
+
+FAR( ˆδ) ≤ α + ∆( n0, n 1)14384 where the excess term ∆( n0, n 1) is defined as 
+
+∆( n0, n 1) = C1n0− β12( β1+1) 
+
+√log n0
+
++ C2n1− β22( β2+1) 
+
+√log n1
+
+(16) 
+
+with some positive constant C1, C 2 > 0.
+
+Corollary 1. Suppose the assumption in Theorem 1 hold, then SAFER control the FRP asymptotically, i.e. 
+
+lim  
+
+> n0,n 1→∞
+
+FAR( ˆδ) ≤ α (17) 
+
+6 Experiments 
+
+In this section, we empirically evaluate the effec-tiveness and robustness of SAFER across different attack settings 1. Our evaluation is designed to an-swer the following four research questions: ( RQ1 )How effectively does SAFER control the FAR com-pared with existing defense methods? ( RQ2 ) How robust is SAFER to varying poisoning rates? ( RQ3 )Can SAFER adapt to different FAR thresholds α
+
+while maintaining consistent FAR control? ( RQ4 )How sensitive is SAFER to the hyperparameter λ?
+
+6.1 Experimental Setup Datasets and Models We conduct experiments on three widely used text classification benchmarks, covering diverse task types: Yelp (Yelp, 2024) for sentiment analysis, AG News (Zhang et al., 2015) for topic classification, and HSOL (David-son et al., 2017) for toxic content detection. As vic-tim models, we use three pre-trained LLMs: BERT-base-uncased (Devlin et al., 2019), RoBERTa-Base (Liu et al., 2019) and Pythia-1B (Biderman et al., 2023). 
+
+Attack Methods In our experiments, we adopt four representative backdoor attacks: BadNets (Gu et al., 2019), which inserts rare-word triggers (e.g., "bf"); AddSent (Dai et al., 2019), which appends full-sentence triggers (e.g., "I watched this 3D movie"); StyleBkd (Qi et al., 2021b), which em-ploys stylistic transformations (e.g., a "Bible" writ-ing style) as triggers; and SynBkd (Qi et al., 2021c), which leverages specific syntactic patterns (e.g., "S(SBAR)(,)(NP)(VP)(.)") as triggers. For all attacks, 20% of the training data is poisoned. Victim models undergoes backdoor training for 5 epochs using a learning rate of 2 × 10 −5.     
+
+> 1Our code is available at https://github.com/ huzr1999/SAFER/tree/master
+
+Baseline Defenses We compare SAFER with five detection-based defenses: STRIP (Gao et al., 2019), BKI (Chen and Dai, 2021), RAP (Yang et al., 2021b), CUBE (Cui et al., 2022), and 
+
+SCM (Xian et al., 2023). BKI and CUBE are orig-inally designed to detect backdoored samples in training data. To ensure a fair comparison, we adapt these methods for inference-time filtering by applying their detection mechanisms to test sam-ples. SCM is designed to control the false rejection rate, that is, the proportion of clean samples in-correctly identified as backdoored. Following the original papers, we use the calibration set to calcu-late thresholds for the above baselines. 
+
+Scoring Function In our experiments, we em-ploy two scoring functions: the Mahalanobis distance-based scores (MDS) which measures the distance of a sample’s feature representation from the distribution of clean samples, and the activation-based scores (BadActs, Yi et al., 2024), which quantify deviations in model activations induced by potential backdoor triggers. For further details regarding these scoring functions, please refer to Appendix B. For methods using scores to achieve statistical guarantees (i.e., SCM and SAFER), we integrate them with these two scores and denote the variants using MDS and BadActs as suffixes "-md" and "-badacts", respectively. 
+
+Implementation Details We implement all the attack methods and baseline defenders using the OpenBackdoor framework (Cui et al., 2022) and remain the default hyperparameter settings for all these attack and defend methods. Experiments are conducted using PyTorch (Paszke et al., 2019) and the Transformers library (Wolf et al., 2020). We use the AdamW optimizer and run all experiments on a single NVIDIA V100 GPU with 32GB of memory. All experiments are repeated 10 times and we report the average results. 
+
+6.2 Results Overall FAR Control Performance In this ex-periment, we set the FAR threshold α = 0 .1 and introduce a 20% poisoning rate to the test samples. SAFER is compared against several baseline de-fenses across various attack scenarios and three datasets. The results for BERT-base-uncased and 
+
+RoBERTa-Base are reported in Table 1 and Ta-ble 2, respectively, while the results for Pythia-1B 
+
+are provided in Appendix D. From these tables, it is evident that SAFER consistently achieves ef-14385 Yelp AGNews HSOL BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power BKI 0.156 1.000 0.219 0.734 0.297 0.592 0.080 1.000 0.155 1.000 0.087 1.000 0.157 0.838 0.187 0.815 0.157 1.000 0.208 0.878 0.215 0.868 0.213 0.880 CUBE 0.322 0.526 0.218 0.895 0.309 0.517 0.200 0.999 0.250 0.750 0.250 0.749 0.203 0.977 0.200 0.998 0.001 0.940 0.383 0.350 0.254 0.603 0.200 0.999 STRIP 0.195 0.886 0.193 0.884 0.193 0.893 0.193 0.922 0.194 0.867 0.197 0.884 0.198 0.926 0.193 0.830 0.194 0.888 0.196 0.886 0.199 0.919 0.197 0.900 RAP 0.208 0.940 0.000 0.624 0.187 0.952 0.229 0.821 0.203 0.975 0.186 0.935 0.204 0.975 0.178 0.906 0.205 0.960 0.137 0.972 0.199 0.968 0.220 0.622 SCM-md 0.090 0.925 0.206 0.934 0.189 0.925 0.037 0.943 0.208 0.952 0.208 0.951 0.202 0.955 0.210 0.939 0.141 0.939 0.208 0.948 0.196 0.951 0.202 0.951 SCM-badacts 0.115 0.995 0.192 0.993 0.182 0.996 0.201 0.996 0.178 0.999 0.066 0.999 0.084 1.000 0.131 0.999 0.188 0.998 0.199 1.000 0.198 0.998 0.160 0.999 SAFER-md 0.019 0.928 0.056 0.916 0.055 0.889 0.014 0.930 0.079 0.884 0.082 0.895 0.092 0.908 0.094 0.811 0.043 0.896 0.078 0.872 0.108 0.555 0.064 0.694 
+
+SAFER-badacts 0.028 0.991 0.090 0.982 0.045 0.956 0.064 0.975 0.112 0.995 0.104 0.999 0.076 0.999 0.034 0.994 0.099 0.993 0.099 0.969 0.117 0.916 0.096 0.991 
+
+Table 1: FAR control results for the BERT-base-uncased model. The numbers presented are the average of 10 independent experiments. We bold the method that controls the FAR ( FAR ≤ 0.1), or the method with the lowest FAR if no method achieves successful control. 
+
+Yelp AGNews HSOL BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power BKI 0.158 1.000 0.018 1.000 0.435 0.325 0.056 1.000 0.155 1.000 0.119 0.999 0.150 0.852 0.145 0.995 0.157 1.000 0.206 0.882 0.215 0.860 0.216 0.876 CUBE 0.002 0.997 0.007 0.999 0.004 0.901 0.312 0.509 0.250 0.750 0.250 0.750 0.238 0.769 0.200 0.999 0.070 0.823 0.372 0.404 0.255 0.725 0.223 0.870 STRIP 0.195 0.908 0.196 0.901 0.184 0.863 0.193 0.869 0.194 0.859 0.196 0.897 0.193 0.845 0.187 0.772 0.193 0.810 0.192 0.850 0.199 0.884 0.190 0.817 RAP 0.340 0.486 0.214 0.920 0.214 0.913 0.228 0.845 0.218 0.893 0.209 0.944 0.216 0.905 0.229 0.839 0.205 0.936 0.209 0.945 0.099 0.751 0.212 0.930 SCM-md 0.208 0.936 0.180 0.935 0.005 0.940 0.205 0.945 0.209 0.948 0.208 0.946 0.206 0.952 0.209 0.942 0.130 0.946 0.195 0.953 0.199 0.932 0.208 0.948 SCM-badacts 0.055 0.995 0.199 0.996 0.041 0.997 0.001 0.998 0.198 0.999 0.200 1.000 0.168 0.999 0.161 0.999 0.026 0.999 0.200 0.998 0.190 0.998 0.171 1.000 SAFER-md 0.033 0.833 0.052 0.860 0.000 0.847 0.050 0.961 0.103 0.865 0.089 0.889 0.099 0.836 0.061 0.862 0.070 0.903 0.076 0.831 0.112 0.728 0.105 0.909 SAFER-badacts 0.050 0.993 0.097 0.988 0.044 0.998 0.056 0.999 0.106 0.992 0.108 0.994 0.112 0.963 0.101 0.997 0.098 0.999 0.103 0.960 0.114 0.950 0.067 0.995 
+
+Table 2: FAR control results for the RoBERTa-Base model. BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 1.0 1.2 
+
+> Power
+> 1.00 1.00 0.33 1.00 1.00 1.00 0.90 0.51 0.91 0.90 0.86 0.87 0.49 0.92 0.91 0.85 0.94 0.94 0.94 0.95 0.99 1.00 1.00 1.00 0.83 0.86 0.85 0.96 0.99 0.99 1.00 1.00
+
+Poison Rate = 0.2 
+
+BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 1.0 1.2 
+
+> 1.00 0.73 0.59 1.00 0.53 0.89 0.52 1.00 0.89 0.89 0.90 0.92 0.94 0.63 0.95 0.82 0.99 0.99 0.99 0.99 1.00 0.99 1.00 1.00 0.87 0.83 0.78 0.89 0.99 0.97 0.92 0.96
+
+Poison Rate = 0.4 
+
+BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 1.0 1.2 
+
+> 1.00 0.73 0.59 1.00 0.53 0.89 0.52 1.00 0.89 0.89 0.90 0.92 0.94 0.63 0.95 0.82 0.99 0.99 0.99 0.99 1.00 0.99 1.00 1.00 0.86 0.82 0.73 0.88 0.99 0.97 0.90 0.96
+
+Poison Rate = 0.6 
+
+BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 
+
+> FAR
+> 0.16 0.02 0.43 0.06 0.00 0.01 0.00 0.31 0.19 0.20 0.18 0.19 0.34 0.21 0.21 0.23 0.21 0.18 0.00 0.21 0.06 0.20 0.04 0.00 0.03 0.05 0.00 0.05 0.05 0.10 0.04 0.06
+
+BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 
+
+> 0.33 0.43 0.53 0.19 0.56 0.43 0.54 0.40 0.39 0.39 0.39 0.39 0.41 0.00 0.38 0.44 0.40 0.40 0.40 0.40 0.26 0.39 0.37 0.40 0.02 0.04 0.06 0.02 0.04 0.10 0.09 0.08
+
+BadNets AddSent StyleBkd SynBkd 0.0 0.2 0.4 0.6 0.8 
+
+> 0.53 0.63 0.72 0.34 0.74 0.63 0.73 0.60 0.59 0.59 0.59 0.59 0.61 0.00 0.58 0.64 0.60 0.60 0.60 0.60 0.44 0.59 0.57 0.60 0.02 0.03 0.07 0.02 0.06 0.10 0.14 0.09
+
+BKI CUBE STRIP RAP SCM-md SCM-badacts SAFER-md SAFER-badacts 
+
+Figure 1: FAR and Power results under varying poisoning ratios. The upper and lower panels show the power and FAR, respectively. In the FAR plots, the user-defined threshold α is indicated by a horizontal line. Methods with bars exceeding this line are considered to have failed in FAR control. 
+
+fective FAR control across most scenarios. While certain baselines, such as BKI, CUBE, and SCM, demonstrate strong performance under specific at-tack types, they fail to maintain reliable FAR con-trol across diverse settings. This inconsistency underscores the limitations of existing detection-based defenses in providing robust and controllable protection against backdoor attacks. In particular, SCM—a baseline specifically designed to control the ratio of falsely rejected clean samples—also struggles to ensure consistent FAR control. This further highlights the necessity of a defense mech-anism like SAFER, which is explicitly designed to regulate FAR across varying conditions. 
+
+FAR Control under Different Poison Ratios To assess the robustness of SAFER under varying lev-els of poisoning, we conduct experiments with poi-son ratios ranging from 0.2 to 0.6. The results, obtained on the Yelp dataset using BERT-base-uncased, are shown in Figure 1. Several key ob-servations can be drawn from these results: First, SAFER consistently maintains the FAR below the user-defined threshold, demonstrating its robust-ness across different poisoning levels. Second, as the poison ratio increases, maintaining a low FAR becomes more challenging. This is expected, as higher poisoning levels make it increasingly diffi-cult for defenses not explicitly designed to control 14386 0.0 0.2 0.4 0.6 0.8 
+
+> FAR
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Power
+
+Poison Ratio = 0.2     
+
+> 0.0 0.2 0.4 0.6 0.8
+> FAR
+> 0.0 0.2 0.4 0.6 0.8 1.0
+
+Poison Ratio = 0.4     
+
+> 0.0 0.2 0.4 0.6 0.8
+> FAR
+> 0.0 0.2 0.4 0.6 0.8 1.0
+
+Poison Ratio = 0.6         
+
+> BKI CUBE STRIP RAP SCM-md SCM-badacts SAFER-md SAFER-badacts FAR = 0.1
+
+Figure 2: The FAR-Power tradeoff under different poison ratio. 0.025 0.050 0.075 0.100 0.125 0.150 0.00 0.25 0.50 0.75 1.00 
+
+> Power
+
+Yelp      
+
+> 0.025 0.050 0.075 0.100 0.125 0.150 0.00 0.25 0.50 0.75 1.00
+
+AGNews      
+
+> 0.025 0.050 0.075 0.100 0.125 0.150 0.00 0.25 0.50 0.75 1.00
+
+HSOL                   
+
+> 0.025 0.050 0.075 0.100 0.125 0.150
+> 0.0 0.1 0.2
+> FAR
+> 0.025 0.050 0.075 0.100 0.125 0.150
+> 0.0 0.1 0.2
+> 0.025 0.050 0.075 0.100 0.125 0.150
+> 0.0 0.1 0.2
+> BadNets AddSent StyleBkd SynBkd
+
+Figure 3: FAR control under different thresholds α. The upper and lower panels show the results of Power and FAR under varying α, respectively. In the FAR panel, diagonal lines y = x are included as a reference to indicate whether the actual FAR is properly controlled under the specified thresholds. 
+
+FAR to prevent backdoored samples from being in-correctly accepted, leading to elevated FAR. Third, while some baseline methods, such as RAP, occa-sionally achieve extremely low FAR, they often do so at the cost of a significant reduction in power. In contrast, SAFER achieves a more favorable bal-ance between FAR control and power, offering both security and utility. To further highlight the superior tradeoff be-tween FAR and power achieved by SAFER, we plot power against FAR under different poison ra-tios in Figure 2. Each method is represented by a point, with points to the right of the vertical line (denoting α = 0 .1) indicating successful FAR con-trol. As shown in the figure, SAFER consistently achieves FAR control across varying poison ratios while maintaining competitive power compared to other baselines. This demonstrates SAFER’s abil-ity to effectively control FAR without significantly compromising utility. 0.2 0.4 0.6 0.8    
+
+> 0.7 0.8 0.9 1.0
+> Power
+> 0.2 0.4 0.6 0.8
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30
+> FAR
+
+Figure 4: FAR and Power results under varying λ. In the FAR plots, the user-defined threshold α is indicated by a horizontal line. 
+
+FAR Control under Different Thresh-olds We further evaluate the performance of our method across various FAR thresh-olds. Specifically, we vary α across the set 
+
+{0.01 , 0.02 , 0.04 , 0.08 , 0.1, 0.12 , 0.15 } and present corresponding power and FAR in Figure 3. As shown in the figure, our method consistently maintains effective FAR control, even under strict thresholds (e.g., α = 0 .01 ), in most scenarios. This demonstrates SAFER’s adaptability to varying safety requirements, making it a versatile solution for applications with stringent FAR constraints. 14387 Sensitivity to Hyperparameter λ In SAFER, we have a hyperparameter λ balancing the bias and variance in πc estimation. Here, we investigate the sensitivity of SAFER to the hyperparameter 
+
+λ. Specifically, we vary λ from 0.1 to 0.9 with increments of 0.1 and evaluate the FAR and power. The results are presented in Figure 4. We observe that SAFER consistently maintains FAR below the user-defined threshold across a wide range of val-ues (from 0.4 to 0.95 ), demonstrating SAFER’s robustness to the choice of λ.
+
+7 Conclusion 
+
+In this work, we tackle the critical vulnerability of LLMs to backdoor attacks by introducing SAFER ,a robust inference-time defense framework that provides explicit and provable control over the FAR. SAFER leverages distributional information from clean calibration data and mixed test data to make accept/reject decisions while adhering to user-defined FAR constraints. Our theoretical anal-ysis proves that SAFER asymptotically bounds the actual FAR by the target threshold. Empirical eval-uations show that SAFER consistently delivers re-liable FAR control under different attack settings, demonstrating its effectiveness as a defense mecha-nism against backdoor attacks in LLMs. 
+
+8 Limitations 
+
+While SAFER provides strong asymptotic guaran-tees for detecting backdoor attacks, its behavior under finite-sample conditions is less well under-stood. Investigating finite-sample bounds on the FAR would be particularly valuable in resource-constrained scenarios. Additionally, while SAFER emphasizes precise FAR control, other perfor-mance metrics, such as detection power, are equally critical in practical applications. Future research could focus on developing methods to balance strict FAR control with maximizing detection power for more comprehensive defense strategies. 
+
+9 Ethical Considerations 
+
+This work seeks to enhance the safety and reliabil-ity of LLMs by mitigating backdoor attacks and providing rigorous control over false acceptance rates. By reducing the risk of malicious inputs by-passing defenses, SAFER contributes to the secure deployment of LLMs, particularly in safety-critical applications. However, we recognize that strict FAR con-trol may inadvertently increase false rejections of benign inputs, potentially impacting certain user groups or applications disproportionately and thereby increasing concerns about fairness and ac-cessibility (Li et al., 2024; Gallegos et al., 2024; Zhang et al., 2025b). To address this, careful cal-ibration and human oversight are essential when implementing such defenses in real-world systems. Lastly, all experiments in this study were con-ducted using publicly available datasets and mod-els, ensuring no use of personal or sensitive user data. We encourage future research to adopt privacy-preserving evaluation protocols and to care-fully assess the broader societal implications of de-ploying backdoor defenses in large-scale language systems. 
+
+Acknowledgements 
+
+This research / project is supported by the National Research Foundation, Singapore, and Cyber Secu-rity Agency of Singapore under its National Cy-bersecurity R&D Programme and CyberSG R&D Cyber Research Programme Office. Any opinions, findings and conclusions or recommendations ex-pressed in these materials are those of the author(s) and do not reflect the views of National Research Foundation, Singapore, Cyber Security Agency of Singapore as well as CyberSG R&D Programme Office, Singapore. 
+
+References     
+
+> Stephen Bates, Emmanuel Candès, Lihua Lei, Yaniv Romano, and Matteo Sesia. 2023. Testing for outliers with conformal p-values. The Annals of Statistics ,51(1):149–178. Marco Antonio Beltran, Marina Ivette Ruiz Mondragon, and Seung Hun Han. 2024. Comparative Analysis of Generative AI Risks in the Public Sector. In Pro-ceedings of the 25th Annual International Conference on Digital Government Research , Dg.o ’24, pages 610–617, New York, NY, USA. Association for Com-puting Machinery. Yoav Benjamini and Yosef Hochberg. 1995. Control-ling the False Discovery Rate: A Practical and Pow-erful Approach to Multiple Testing. Journal of the Royal Statistical Society: Series B (Methodological) ,57(1):289–300. Yoav Benjamini and Daniel Yekutieli. 2001. The Con-trol of the False Discovery Rate in Multiple Test-ing under Dependency. The Annals of Statistics ,29(4):1165–1188.
+
+14388 Stella Biderman, Hailey Schoelkopf, Quentin Gregory Anthony, Herbie Bradley, Kyle O’Brien, Eric Hal-lahan, Mohammad Aflah Khan, Shivanshu Purohit, Usvsn Sai Prashanth, Edward Raff, Aviya Skowron, Lintang Sutawika, and Oskar Van Der Wal. 2023. Pythia: A Suite for Analyzing Large Language Mod-els Across Training and Scaling. In Proceedings of the 40th International Conference on Machine Learn-ing , pages 2397–2430. PMLR. Rishi Bommasani, Drew A. Hudson, Ehsan Adeli, Russ Altman, Simran Arora, Sydney von Arx, Michael S. Bernstein, Jeannette Bohg, Antoine Bosselut, Emma Brunskill, Erik Brynjolfsson, S. Buch, Dallas Card, Rodrigo Castellon, Niladri S. Chatterji, Annie S. Chen, Kathleen A. Creel, Jared Davis, Dora Dem-szky, and 95 others. 2021. On the opportunities and risks of foundation models. ArXiv .Bryant Chen, Wilka Carvalho, Nathalie Baracaldo, Heiko Ludwig, Benjamin Edwards, Taesung Lee, Ian Molloy, and Biplav Srivastava. 2018. Detect-ing Backdoor Attacks on Deep Neural Networks by Activation Clustering. Preprint , arXiv:1811.03728. Chuanshuai Chen and Jiazhu Dai. 2021. Mitigating backdoor attacks in LSTM-based text classification systems by Backdoor Keyword Identification. Neu-rocomputing , 452:253–262. Sishuo Chen, Wenkai Yang, Zhiyuan Zhang, Xiaohan Bi, and Xu Sun. 2022. Expose Backdoors on the Way: A Feature-Based Efficient Defense against Tex-tual Backdoor Attacks. Preprint , arXiv:2210.07907. Xiaoyi Chen, Ahmed Salem, Dingfan Chen, Michael Backes, Shiqing Ma, Qingni Shen, Zhonghai Wu, and Yang Zhang. 2021. BadNL: Backdoor Attacks against NLP Models with Semantic-preserving Im-provements. In Annual Computer Security Applica-tions Conference , pages 554–569. Xinyun Chen, Chang Liu, Bo Li, Kimberly Lu, and Dawn Song. 2017. Targeted Backdoor Attacks on Deep Learning Systems Using Data Poisoning. 
+
+Preprint , arXiv:1712.05526. Yu Chen, Qi Cao, Kaike Zhang, Xuchao Liu, and Huawei Shen. 2024. PKAD: Pretrained Knowledge is All You Need to Detect and Mitigate Textual Back-door Attacks. In Findings of the Association for Computational Linguistics: EMNLP 2024 , pages 5837–5849, Miami, Florida, USA. Association for Computational Linguistics. Joseph Chervenak, Harry Lieman, Miranda Blanco-Breindel, and Sangita Jindal. 2023. The promise and peril of using a large language model to obtain clinical information: ChatGPT performs strongly as a fertility counseling tool with limitations. Fertility and Sterility , 120(3, Part 2):575–583. Ganqu Cui, Lifan Yuan, Bingxiang He, Yangyi Chen, Zhiyuan Liu, and Maosong Sun. 2022. A unified eval-uation of textual backdoor learning: Frameworks and benchmarks. In Proceedings of NeurIPS: Datasets and Benchmarks .Jingyi Cui, Hanyuan Hang, Yisen Wang, and Zhouchen Lin. 2021. GBHT: Gradient Boosting Histogram Transform for Density Estimation. In Proceedings of the 38th International Conference on Machine Learning , pages 2233–2243. PMLR. Jiazhu Dai, Chuanshuai Chen, and Yufeng Li. 2019. A Backdoor Attack Against LSTM-Based Text Classi-fication Systems. IEEE Access , 7:138872–138878. Thomas Davidson, Dana Warmsley, Michael Macy, and Ingmar Weber. 2017. Automated hate speech de-tection and the problem of offensive language. In 
+
+Proceedings of the international AAAI conference on web and social media , volume 11, pages 512–515. Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT: Pre-training of Deep Bidirectional Transformers for Language Un-derstanding. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Tech-nologies, Volume 1 (Long and Short Papers) , pages 4171–4186, Minneapolis, Minnesota. Association for Computational Linguistics. Isabel O. Gallegos, Ryan A. Rossi, Joe Barrow, Md Mehrab Tanjim, Sungchul Kim, Franck Dernon-court, Tong Yu, Ruiyi Zhang, and Nesreen K. Ahmed. 2024. Bias and Fairness in Large Language Models: A Survey. Computational Linguistics , 50(3):1097– 1179. Bowen Gang, Sun , Wenguang, and Weinan and Wang. 2023. Structure–Adaptive Sequential Testing for On-line False Discovery Rate Control. Journal of the American Statistical Association , 118(541):732–745. Yansong Gao, Change Xu, Derui Wang, Shiping Chen, Damith C. Ranasinghe, and Surya Nepal. 2019. STRIP: A defence against trojan attacks on deep neural networks. In Proceedings of the 35th Annual Computer Security Applications Conference , ACSAC ’19, pages 113–125, New York, NY, USA. Associa-tion for Computing Machinery. Tianyu Gu, Kang Liu, Brendan Dolan-Gavitt, and Sid-dharth Garg. 2019. BadNets: Evaluating Backdoor-ing Attacks on Deep Neural Networks. IEEE Access ,7:47230–47244. Xuanli He, Qiongkai Xu, Jun Wang, Benjamin Rubin-stein, and Trevor Cohn. 2023. Mitigating Backdoor Poisoning Attacks through the Lens of Spurious Cor-relation. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing ,pages 953–967, Singapore. Association for Compu-tational Linguistics. Yuyang Huo, Lin Lu, Haojie Ren, and Changliang Zou. 2024. Real-Time Selection Under General Con-straints via Predictive Inference. Advances in Neural Information Processing Systems , 37:61267–61305. Ying Jin and Emmanuel J Candes. Selection by Predic-tion with Conformal p-values. 14389 Nikhil Kandpal, Matthew Jagielski, Florian Tramèr, and Nicholas Carlini. 2023. Backdoor Attacks for In-Context Learning with Language Models. Preprint ,arXiv:2307.14692. Keita Kurita, Paul Michel, and Graham Neubig. 2020. Weight Poisoning Attacks on Pretrained Models. In 
+
+Proceedings of the 58th Annual Meeting of the Asso-ciation for Computational Linguistics , pages 2793– 2806, Online. Association for Computational Lin-guistics. Jiazhao Li, Zhuofeng Wu, Wei Ping, Chaowei Xiao, and V.G.Vinod Vydiswaran. 2023a. Defending against Insertion-based Textual Backdoor Attacks via Attri-bution. In Findings of the Association for Compu-tational Linguistics: ACL 2023 , pages 8818–8833, Toronto, Canada. Association for Computational Lin-guistics. Yige Li, Xixiang Lyu, Nodens Koren, Lingjuan Lyu, Bo Li, and Xingjun Ma. 2021. Anti-Backdoor Learn-ing: Training Clean Models on Poisoned Data. In 
+
+Advances in Neural Information Processing Systems ,volume 34, pages 14900–14912. Curran Associates, Inc. Yingji Li, Mengnan Du, Rui Song, Xin Wang, and Ying Wang. 2024. A Survey on Fairness in Large Lan-guage Models. Preprint , arXiv:2308.10149. Yinheng Li, Shaofei Wang, Han Ding, and Hang Chen. 2023b. Large Language Models in Finance: A Sur-vey. In Proceedings of the Fourth ACM International Conference on AI in Finance , ICAIF ’23, pages 374– 382, New York, NY, USA. Association for Comput-ing Machinery. Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Man-dar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. 2019. RoBERTa: A Robustly Optimized BERT Pretrain-ing Approach. Preprint , arXiv:1907.11692. Ariane Marandon, Lihua Lei, David Mary, and Etienne Roquain. 2024. Adaptive novelty detection with false discovery rate guarantee. The Annals of Statistics ,52(1):157–183. Yuqi Nie, Yaxuan Kong, Xiaowen Dong, John M. Mul-vey, H. Vincent Poor, Qingsong Wen, and Stefan Zohren. 2024. A Survey of Large Language Models for Financial Applications: Progress, Prospects and Challenges. Preprint , arXiv:2406.11903. OpenAI. 2023. Gpt-4 technical report. https:// openai.com/research/gpt-4 .Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Desmaison, Andreas Köpf, Edward Yang, Zach DeVito, Martin Raison, Alykhan Te-jani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, and 2 others. 2019. PyTorch: An Imperative Style, High-Performance Deep Learning Library. Preprint ,arXiv:1912.01703. Fanchao Qi, Yangyi Chen, Mukai Li, Yuan Yao, Zhiyuan Liu, and Maosong Sun. 2021a. ONION: A Simple and Effective Defense Against Textual Back-door Attacks. Preprint , arXiv:2011.10369. Fanchao Qi, Yangyi Chen, Xurui Zhang, Mukai Li, Zhiyuan Liu, and Maosong Sun. 2021b. Mind the Style of Text! Adversarial and Backdoor Attacks Based on Text Style Transfer. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing , pages 4569–4580, Online and Punta Cana, Dominican Republic. Association for Computational Linguistics. Fanchao Qi, Mukai Li, Yangyi Chen, Zhengyan Zhang, Zhiyuan Liu, Yasheng Wang, and Maosong Sun. 2021c. Hidden Killer: Invisible Textual Backdoor Attacks with Syntactic Trigger. In Proceedings of the 59th Annual Meeting of the Association for Compu-tational Linguistics and the 11th International Joint Conference on Natural Language Processing (Vol-ume 1: Long Papers) , pages 443–453, Online. Asso-ciation for Computational Linguistics. Bernard W. Silverman. 1978. Weak and Strong Uniform Consistency of the Kernel Estimate of a Density and its Derivatives. The Annals of Statistics , 6(1):177– 184. John D. Storey, Jonathan E. Taylor, and David Sieg-mund. 2004. Strong Control, Conservative Point Estimation and Simultaneous Conservative Consis-tency of False Discovery Rates: A Unified Approach. 
+
+Journal of the Royal Statistical Society Series B: Sta-tistical Methodology , 66(1):187–205. Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, and Guillaume Lample. 2023. LLaMA: Open and Efficient Foundation Language Models. Preprint ,arXiv:2302.13971. Brandon Tran, Jerry Li, and Aleksander Madry. 2018. Spectral Signatures in Backdoor Attacks. In Ad-vances in Neural Information Processing Systems ,volume 31. Curran Associates, Inc. Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond, Clement Delangue, Anthony Moi, Pier-ric Cistac, Tim Rault, Rémi Louf, Morgan Funtowicz, Joe Davison, Sam Shleifer, Patrick von Platen, Clara Ma, Yacine Jernite, Julien Plu, Canwen Xu, Teven Le Scao, Sylvain Gugger, and 3 others. 2020. Hugging-Face’s Transformers: State-of-the-art Natural Lan-guage Processing. Preprint , arXiv:1910.03771. Xiaoyang Wu, Huo , Yuyang, Ren , Haojie, and Changliang and Zou. 2024. Optimal Subsampling via Predictive Inference. Journal of the American Statistical Association , 119(548):2844–2856. Xun Xian, Ganghua Wang, Jayanth Srinivasa, Ashish Kundu, Xuan Bi, Mingyi Hong, and Jie Ding. 2023. A Unified Detection Framework for Inference-Stage 14390 Backdoor Defenses. Advances in Neural Information Processing Systems , 36:7867–7894. Wenkai Yang, Lei Li, Zhiyuan Zhang, Xuancheng Ren, Xu Sun, and Bin He. 2021a. Be Careful about Poi-soned Word Embeddings: Exploring the Vulnerabil-ity of the Embedding Layers in NLP Models. In 
+
+Proceedings of the 2021 Conference of the North American Chapter of the Association for Computa-tional Linguistics: Human Language Technologies ,pages 2048–2058, Online. Association for Computa-tional Linguistics. Wenkai Yang, Yankai Lin, Peng Li, Jie Zhou, and Xu Sun. 2021b. RAP: Robustness-Aware Perturba-tions for Defending against Backdoor Attacks on NLP Models. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Process-ing , pages 8365–8381, Online and Punta Cana, Do-minican Republic. Association for Computational Linguistics. Yelp. 2024. Yelp open dataset. Accessed: 2024-05-20. Biao Yi, Sishuo Chen, Yiming Li, Tong Li, Baolei Zhang, and Zheli Liu. 2024. BadActs: A Univer-sal Backdoor Defense in the Activation Space. In 
+
+Findings of the Association for Computational Lin-guistics: ACL 2024 , pages 5339–5352, Bangkok, Thailand. Association for Computational Linguistics. Xiang Zhang, Junbo Zhao, and Yann LeCun. 2015. Character-level Convolutional Networks for Text Classification. In Advances in Neural Information Processing Systems , volume 28. Curran Associates, Inc. Zheng Zhang, Ning Li, Qi Liu, Rui Li, Weibo Gao, Qingyang Mao, Zhenya Huang, Baosheng Yu, and Dacheng Tao. 2025a. The other side of the coin: Exploring fairness in retrieval-augmented generation. 
+
+arXiv preprint arXiv:2504.12323 .Zheng Zhang, Qi Liu, Zirui Hu, Yi Zhan, Zhenya Huang, Weibo Gao, Qingyang Mao, and Enhong Chen. 2025b. A hybrid adaptive sampling strategy for fair and accurate meta-learned user modeling. 
+
+ACM Transactions on Information Systems , 44(1):1– 39. Zhiyuan Zhang, Lingjuan Lyu, Xingjun Ma, Chenguang Wang, and Xu Sun. 2022. Fine-mixing: Mitigating Backdoors in Fine-tuned Language Models. In Find-ings of the Association for Computational Linguistics: EMNLP 2022 , pages 355–372, Abu Dhabi, United Arab Emirates. Association for Computational Lin-guistics. Shuai Zhao, Meihuizi Jia, Anh Tuan Luu, Fengjun Pan, and Jinming Wen. 2024. Universal Vulnerabilities in Large Language Models: Backdoor Attacks for In-context Learning. In Proceedings of the 2024 Confer-ence on Empirical Methods in Natural Language Pro-cessing , pages 11507–11522, Miami, Florida, USA. Association for Computational Linguistics. Biru Zhu, Yujia Qin, Ganqu Cui, Yangyi Chen, Weilin Zhao, Chong Fu, Yangdong Deng, Zhiyuan Liu, Jin-gang Wang, Wei Wu, Maosong Sun, and Ming Gu. 2022. Moderate-fitting as a Natural Backdoor De-fender for Pre-trained Language Models. Advances in Neural Information Processing Systems , 35:1086– 1099. 14391 A Proofs 
+
+A.1 Auxiliary Lemmas Lemma 2. Let p, ˆp ∈ [0 , 1] be a true quantity and its estimator, and let λ ∈ (0 , 1) be a fixed threshold. Define the events A := {p > λ } and 
+
+ˆA := {ˆp > λ }. Then for any ϵ > 0,
+
+A△ ˆA = ( A\ ˆA) ∪ ( ˆA\A)
+
+⊆ {| p − ˆp| > ϵ } ∪ {| p − λ| ≤ ϵ}, (18) 
+
+where △ denotes the symmetric difference between two sets. Consequently, 
+
+|Pr( A)−Pr( ˆA)| ≤ Pr( |p−ˆp| > ϵ )+Pr( |p−λ| ≤ ϵ).
+
+(19) 
+
+Proof. Assume that both 
+
+|p − ˆp| ≤ ϵ and |p − λ| > ϵ. (20) hold. We consider two exhaustive cases: • If p > λ + ϵ, then 
+
+ˆp ≥ p − | p − ˆp| > p − ϵ > λ. (21) which implies that ˆA = A = 1 holds. • If p ≤ λ − ϵ, then 
+
+ˆp ≤ p + |p − ˆp| < p + ϵ < λ. (22) which implies that ˆA = A = 0 holds. In both cases, we have ˆA = A. Therefore, the contrapositive statement holds: 
+
+A△ ˆA ⊆ {| p − ˆp| > ϵ } ∪ {| p − λ| ≤ ϵ}. (23) Taking probabilities on both sides and applying the union bound yields the desired result. 
+
+Lemma 3 (Small-ball probability bound for pj ).
+
+Under Assumption 1, let Fc denote the cumulative distribution function of Wj | δj = 0 , with corre-sponding density ρc. By Definition 
+
+pj := Fc(Wj ),
+
+where Wj has marginal density ρmix . Then there exists a constant C > 0 such that for any λ ∈ [0 , 1] 
+
+and any ϵ > 0,
+
+Pr (|pj − λ| ≤ ϵ) ≤ C ϵ. 
+
+Proof. By definition, pj = Fc(Wj ). Since Fc is non-decreasing and absolutely continuous, it is dif-ferentiable almost everywhere with derivative 
+
+F ′
+
+> c
+
+(w) = ρc(w).
+
+By Assumption 1, there exist constants 0 < l ≤
+
+M < ∞ such that, for all w in the support of ρmix ,
+
+0 ≤ ρmix (w) ≤ M and l ≤ ρc(w) ≤ M. 
+
+In particular, ρc(w) ≥ l implies that Fc is strictly increasing on the support of ρmix , and hence invert-ible there. Let ρpj denote the density of pj . By the change-of-variables formula, for any u in the image of the support under Fc, we have 
+
+ρpj (u) = ρmix 
+
+(F −1 
+
+> c
+
+(u))
+
+ρc
+
+(F −1 
+
+> c
+
+(u)) .
+
+Using the bounds on ρmix and ρc, it follows that 
+
+ρpj (u) ≤ Ml =: C′, for all such u. 
+
+Therefore, for any λ ∈ [0 , 1] and any ϵ > 0,
+
+Pr (|pj − λ| ≤ ϵ) =
+
+∫ λ+ϵλ−ϵ
+
+ρpj (u) du ≤ 2C′ ϵ, 
+
+which completes the proof. 
+
+Lemma 4 (The uniform convergence of probability density estimator) . Suppose Assumption 1 holds and we let ˆρ be a weighted average of T histogram estimators, 
+
+ˆρ(w) = 
+
+> T
+
+∑
+
+> t=1
+
+ath(t)(w),
+
+> T
+
+∑
+
+> t=1
+
+at = 1 , a t ≥ 0,
+
+(24) 
+
+where each h(t) is constructed from n i.i.d. samples 
+
+(w1, . . . , w n ∼ ρ) using a partition with bin width 
+
+ht = Ctn−γ , γ ∈ (0 , 1) . (25) 
+
+Then there exists a constant 
+
+C = C(L, {Ct}Tt=1 , R, β, T ) > 0 (26) 
+
+such that, with probability at least 1 − 1 
+
+> n
+
+,
+
+sup 
+
+> w
+
+|ˆρ(w) − ρ(w)| ≤ C · n− β
+
+> 2(1+ β)
+
+√log n. (27) 14392 Proof. We first prove each histogram estimator h(t)
+
+converges uniformly to ρ at the desired rate, and then extend the result to the weighted average ˆρ by convexity. For each histogram estimator h(t), let B(t)(w)
+
+denote the bin containing w and define the bin-averaged density: 
+
+ρB(t)(w) := 1
+
+|B(t)(w)|
+
+∫
+
+> B(t)(w)
+
+ρ(u) du. (28) By the triangle inequality, we have 
+
+sup 
+
+> w
+
+|h(t)(w) − ρ(w)|≤ sup 
+
+> w
+
+|h(t)(w) − ρB(t)(w)|
+
+︸ ︷︷ ︸
+
+> Term 1
+
++ sup 
+
+> w
+
+|ρB(t)(w) − ρ(w)|
+
+︸ ︷︷ ︸
+
+> Term 2
+
+,
+
+(29) 
+
+Through this decomposition, we separate the total error into two parts: the statistical error from finite sampling (Term 1) and the approximation error due to the smoothness of ρ (Term 2). Next, we will bound each term individually. 
+
+Bounding Term 1 We begin our analysis by fo-cusing on certain bin B(t)(w) in the t-th histogram estimator. Fix t and bin B, define the indicator random variables: 
+
+Zi = I(wi ∈ B), i = 1 , 2, . . . , n. (30) Then, 
+
+h(t)(w) = 1
+
+n|B|
+
+> n
+
+∑
+
+> i=1
+
+Zi, ρB = 1
+
+|B| E[Zi]. (31) By Hoeffding’s inequality, for any η > 0,
+
+Pr 
+
+(
+
+|h(t)(w) − ρB | > η 
+
+)
+
+≤ 2 exp( −2n|B|2η2).
+
+(32) Since the support has length R, the number of bins is at most R/ |B|. Applying a union bound over all bins yields that, with probability at least 1 − δ,
+
+sup 
+
+> w
+
+|h(t)(w) − ρB(t)(w)| ≤ 
+
+√√√√ log 
+
+( 2Rδ·| B|
+
+)
+
+2n|B|2 . (33) Using the bin width |B| = Ctn−γ , we have 
+
+sup 
+
+> w
+
+|h(t)(w) − ρB(t)(w)| ≤ 1
+
+√2Ct
+
+nγ− 12
+
+√
+
+log 
+
+( 2nγ
+
+δRC t
+
+)
+
+.
+
+(34) 
+
+Bounding the Term 2 By the Hölder continuity of ρ, for any u, w ∈ B(t)(w),
+
+|ρ(u) − ρ(w)| ≤ L|B(t)(w)|β (35) Therefore for any fixed w, we have 
+
+|ρB(t)(w) − ρ(w)| =
+
+∣∣∣∣∣
+
+1
+
+|B(t)(w)|
+
+∫
+
+> B(t)(w)
+
+ρ(y) dy − ρ(w)
+
+∣∣∣∣∣
+
+≤ 1
+
+|B(t)|(w)
+
+∫
+
+> B(t)(w)
+
+|ρ(y) − ρ(w)| dy 
+
+≤ L · Cβ 
+
+> 1
+
+· n−βγ 
+
+(36) 
+
+Taking the supremum over all bins, we have 
+
+sup 
+
+> w
+
+|ρB(t)(w) − ρ(w)| ≤ L · Cβ 
+
+> 1
+
+· n−βγ . (37) 
+
+Combining the bounds. Combining both error terms, we conclude that with probability at least 
+
+1 − δ,
+
+sup 
+
+> w
+
+|h(t)(w) − ρ(w)|≤ 1
+
+√2Ct
+
+nγ− 12
+
+√
+
+log 
+
+( 2nγ
+
+δRC t
+
+)
+
++ L · Cβt · n−βγ .
+
+(38) Let fn(γ) = 1√2Ct
+
+nγ− 12
+
+√
+
+log 
+
+( 2nγ
+
+> δRC t
+
+)
+
++ L · Cβt ·
+
+n−βγ and δ = 1  
+
+> T·n
+
+. Observe that 
+
+log 
+
+( 2nγ
+
+δRC t
+
+)
+
+= γ log n+log (2 nT )+log 
+
+( 1
+
+RC t
+
+)
+
+,
+
+(39) Since γ > 0, there exist a n′ = n′(Ct, R, T )
+
+such that for all n > n ′, we have log 
+
+( 2nγ
+
+> δRC t
+
+)
+
+≤
+
+2γ log n. Therefore, for all n > n ′, we have 
+
+fn(γ) ≤ 1
+
+√2Ct
+
+nγ− 12
+
+√2γ log n + L · Cβt · n−βγ .
+
+(40) To minimize the right-hand side, we set γ∗ = 
+
+> 12(1+ β)
+
+, which yields 
+
+fn (γ∗) = ( LC βt + 1
+
+√2Ct
+
+√
+
+log n
+
+1 + β )n− β
+
+> 2(1+ β)
+
+≤ C′
+
+> t
+
+n− β
+
+> 2(1+ β)
+
+√log n, 
+
+(41) where C′ 
+
+> t
+
+:= LC βt + 1√2Ct
+
+√ 11+ β . Therefore, for each fixed t ∈ { 1, . . . , T }, we have, with probabil-ity at least 1 − 1 
+
+> nT
+
+,
+
+sup 
+
+> w
+
+|h(t)(w) − ρ(w)| ≤ C′
+
+> t
+
+n− β
+
+> 2(1+ β)
+
+√log n (42) 14393 Applying a union bound over t = 1 , . . . , T , we obtain that with probability at least 1 − 1 
+
+> n
+
+,
+
+sup 
+
+> w
+
+|h(t)(w) − ρ(w)| ≤ C′
+
+> t
+
+n− β
+
+> 2(1+ β)
+
+√log n
+
+for all t = 1 , . . . , T. 
+
+(43) On this event, using the convexity of ˆρ(w) = ∑Tt=1 ath(t)(w), we have 
+
+sup 
+
+> w
+
+|ˆρ(w) − ρ(w)| ≤ 
+
+> T
+
+∑
+
+> t=1
+
+at sup 
+
+> w
+
+|h(t)(w) − ρ(w)|≤
+
+(
+
+max   
+
+> t∈[T]
+
+C′
+
+> t
+
+)
+
+n− β
+
+> 2(1+ β)
+
+√log n. 
+
+This completes the proof. 
+
+Lemma 5 (Consistency of the null proportion esti-mator) . Under Assumption 2, there exist positive constants C1, C 2 > 0 such that, with probability at least 1 − 1 
+
+> n1
+
+,
+
+|π0 − ˆπ0| ≤ C1
+
+√ log n0
+
+n0
+
++ C2
+
+√ log n1
+
+n1
+
+, (44) 
+
+Proof. Recall that the empirical p-value estimator is defined as 
+
+ˆpj = 1 + ∑ 
+
+> i∈[n0]
+
+I(G(wj ) > G (wi)) 1 + n0
+
+, (45) where G is a monotone function. Define Aj := 
+
+{pj > λ } and ˆAj := {ˆpj > λ }. By the law of total probability: 
+
+Pr( Aj ) = Pr( pj > λ | ybd  
+
+> j
+
+= 0) · π0
+
++ Pr( pj > λ | ybd  
+
+> j
+
+= 1) · (1 − π0). (46) For clean samples, pj ∼ Uniform [0 , 1] , which im-plies 
+
+Pr( pj > λ | ybd  
+
+> j
+
+= 0) = 1 − λ. (47) By the assumption of the lemma, we have Pr( pj >λ | ybd  
+
+> j
+
+= 1) = 0 . Therefore, 
+
+Pr( Aj ) = π0(1 − λ)+ (1 − π0) · Pr( pj > λ | ybd  
+
+> j
+
+= 1) = πc · (1 − λ).
+
+(48) Then the error of the null proportion estimator can thus be written as 
+
+|ˆπ0 − π0| = 11 − λ
+
+∣∣∣∣∣∣Pr( Aj ) − 1
+
+n1
+
+∑
+
+> j∈[n1]
+
+I( ˆAj )
+
+∣∣∣∣∣∣
+
+≤ 11 − λ
+
+( ∣∣∣Pr( Aj ) − Pr( ˆAj )
+
+∣∣∣︸ ︷︷ ︸
+
+> (1)
+
++
+
+∣∣∣∣∣∣Pr( ˆAj ) − 1
+
+n1
+
+∑
+
+> j∈[n1]
+
+I( ˆAj )
+
+∣∣∣∣∣∣︸ ︷︷ ︸
+
+> (2)
+
+)
+
+(49) We now bound each term individually. 
+
+Term (1): By Lemma 2, for any ϵ > 0,
+
+| Pr( Aj ) − Pr( ˆAj )|≤ Pr( |ˆpj − pj | > ϵ ) + Pr( |pj − λ| ≤ ϵ).
+
+(50) For the first term on the right-hand side, condi-tioned on wj , the Vi = I(G(wj ) > G (wi)) are i.i.d. Bernoulli with mean pj . By Hoeffding’s in-equality, 
+
+Pr( |ˆpj − pj | > ϵ | wj ) ≤ 2 exp( −2n0ϵ2).
+
+Since the bound is uniform over wj , it holds uncon-ditionally: 
+
+Pr( |ˆpj − pj | > ϵ ) ≤ 2 exp( −2n0ϵ2).
+
+For the second term, by Lemma 3, there exists a constant C > 0 such that 
+
+Pr( |pj − λ| ≤ ϵ) ≤ C · ϵ. 
+
+Combining the two bounds, we have 
+
+|Pr( Aj ) − Pr( ˆAj )| ≤ 2 exp( −2n0ϵ2) + C · ϵ. 
+
+Term (2): Define Uj = I(ˆ pj > λ ). Conditioned on Dcal , the Uj are i.i.d. random variables. By applying Hoeffding’s inequality:        
+
+> Pr
+> ∣∣∣∣∣∣E[Uj]−1
+> n1
+> ∑
+> j∈[n1]
+> Uj
+> ∣∣∣∣∣∣< ϵ | D cal
+> ≥1−2 exp( −2n1ϵ2).
+> (51)
+
+Again, since the bound does not depend on Dcal ,it holds unconditionally. Thus, with probability at least 1 − δ, the second term is bounded as 
+
+(2) ≤
+
+√
+
+log ( 2
+
+> δ
+
+)
+
+2n1
+
+(52) 14394 Final Bound: Combining the two terms , we ob-tain, with probability at least 1 − δ,
+
+|ˆπ0−π0| ≤ 11 − λ
+
+2 exp( −2n0ϵ2) + C · ϵ +
+
+√
+
+log ( 2
+
+> δ
+
+)
+
+2n1
+
+ .
+
+(53) 
+
+Choosing 
+
+ϵ =
+
+√ log n0
+
+n0
+
+, δ = 1
+
+n1
+
+(54) yields 
+
+|ˆπ0−π0| ≤ 11 − λ
+
+(
+
+2 · 1
+
+n02 + C ·
+
+√ log n0
+
+n0
+
++
+
+√ log(2 n1)2n1
+
+)
+
+(55) 
+
+with probability at least 1 − 1 
+
+> n1
+
+.For sufficiently larger n0 and n1, the first term will be absorbed by the second term and the fac-tor of √log(2 n1) can be bounded by a constant multiple of √log n1. Therefore, there exist con-stants C′, C ′′ > 0 such that, with probability at least 1 − 1 
+
+> n1
+
+,
+
+|ˆπ0 − π0| ≤ 11 − λ
+
+(
+
+C′ ·
+
+√ log n0
+
+n0
+
++ C′′ 
+
+√ log n1
+
+n1
+
+)
+
+= C′ 
+
+> 1
+
+·
+
+√ log n0
+
+n0
+
++ C′′  
+
+> 1
+
+·
+
+√ log n1
+
+n1
+
+,
+
+(56) 
+
+where C′ 
+
+> 1
+
+= C′ 
+
+> 1−λ
+
+and C′′  
+
+> 1
+
+= C′′  
+
+> 1−λ
+
+.
+
+Lemma 6 (Uniform convergence of ˆL). Sup-pose Assumption 1-2 hold, there exist constants 
+
+C1, C 2 > 0 such that, with probability at least 
+
+1 − 1 
+
+> n0
+
+− 2 
+
+> n1
+
+,
+
+sup 
+
+> w
+
+∣∣L(w) − ˆL(w)∣∣
+
+≤ C1n0− β12(1+ β1)
+
+√log n0
+
++ C2 n1− β22(1+ β2)
+
+√log n1.
+
+(57) 
+
+Proof. Recall that 
+
+L(w) = ρc(w) π0
+
+ρmix (w) , ˆL(w) = ˆρc(w) ˆ π0
+
+ˆρmix (w) .
+
+Then 
+
+sup 
+
+> w
+
+∣∣L(w) − ˆL(w)∣∣
+
+= sup 
+
+> w
+
+∣∣∣∣ ˆρc(w) ˆ π0
+
+ˆρmix (w) − ρc(w) π0
+
+ρmix (w)
+
+∣∣∣∣
+
+= sup 
+
+> w
+
+1
+
+ρmix (w)ˆ ρmix (w)
+
+(
+
+ˆπ0 ρmix (w) ∣∣ˆρc(w) − ρc(w)∣∣
+
++ ρmix (w)ρc(w) ∣∣ˆπ0 − π0
+
+∣∣
+
++ π0 ρc(w) ∣∣ρmix (w) − ˆρmix (w)∣∣)
+
+.
+
+(58) 
+
+By Assumption 1, there exists l > 0 such that 
+
+inf w ρmix (w) ≥ l. Moreover, Lemma 4 implies that, with probability at least 1 − 1 
+
+> n1
+
+,
+
+sup 
+
+> w
+
+∣∣ˆρmix (w)−ρmix (w)∣∣ ≤ Cρmix n1− β22(1+ β2)
+
+√log n1.
+
+Hence, for sufficiently large n1,
+
+inf  
+
+> w
+
+ˆρmix (w) ≥ l − Cρmix n1− β22(1+ β2)
+
+√log n1 ≥ l
+
+2 .
+
+Also, sup w ρc(w) ≤ M for some M > 0. Com-bining these bounds yields 
+
+sup 
+
+> w
+
+∣∣L(w) − ˆL(w)∣∣
+
+≤ 2
+
+l
+
+(
+
+sup 
+
+> w
+
+∣∣ˆρc(w) − ρc(w)∣∣
+
++ M ∣∣ˆπ0 − π0
+
+∣∣ + sup 
+
+> w
+
+∣∣ˆρmix (w) − ρmix (w)∣∣)
+
+.
+
+(59) Applying Lemma 4 to both ˆρc and ˆρmix , and Lemma 5 to ˆπ0, we obtain that, with probability at least 1 − 1 
+
+> n0
+
+− 2 
+
+> n1
+
+,
+
+sup 
+
+> w
+
+∣∣L(w) − ˆL(w)∣∣
+
+≤ 2
+
+l
+
+(
+
+Cρc n0− β12(1+ β1)
+
+√log n0
+
++ Cρmix n1− β22(1+ β2)
+
+√log n1
+
++ Cπ0
+
+√ log n0
+
+n0
+
++ C′
+
+> π0
+
+√ log n1
+
+n1
+
+)
+
+.
+
+(60) For sufficiently large n0 and n1, the terms 
+
+√ log n0 
+
+> n0
+
+and 
+
+√ log n1 
+
+> n1
+
+are dominated by n0− β12(1+ β1) √log n0 and n1− β22(1+ β2) √log n1,respectively. Absorbing constants into C1 and C2
+
+completes the proof. 
+
+A.2 Proof of Lemma 1 
+
+Proof. By definition, the FAR is given by: 
+
+FAR = E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )δj
+
+1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+.
+
+Using the law of total expectation and the indepen-dence of δj , we can write: 
+
+FAR = E
+
+[
+
+E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )δj
+
+1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+∣∣∣∣∣ {wj }j∈[n1]
+
+]] 
+
+= E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )E[δj | wj ]1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+.
+
+(61) 14395 Since Lj = Pr( δj = 0 |wj ) = 1 − E[δj | wj ].Then, 
+
+FAR = E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )(1 − Lj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+.
+
+A.3 Proof of Theorem 1 
+
+Proof. Let ˆLj denote the estimated value of Lj
+
+used in the decision rule. We decompose the FAR as: 
+
+FAR = E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )(1 − ˆLj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
++ E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )( ˆLj − Lj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+= α + E
+
+[ ∑ 
+
+> j∈[n1]
+
+(1 − ˆδj )( ˆLj − Lj )1 ∨ ∑
+
+> j∈[n1]
+
+(1 − ˆδj )
+
+]
+
+,
+
+(62) where the first term equals α by construction of the Algorithm 1. To bound the second term, note that according to lemma 6 for any j,
+
+|Lj − ˆLj | ≤ C1n0− β12(1+ β1)
+
+√log n0
+
++ C2n1− β22(1+ β2)
+
+√log n1
+
+(63) with probability at least 1 − 1 
+
+> n0
+
+− 2 
+
+> n0
+
+. Let event E
+
+denote the event that this bound holds. Then, we can write: 
+
+E
+
+[∣ ∣∣∣∣∑ 
+
+> j
+
+(1 − ˆδj )( ˆLj − Lj )1 ∨ ∑ 
+
+> j
+
+(1 − ˆδj )
+
+∣∣∣∣∣]
+
+≤ E
+
+[ ∑  
+
+> j
+
+(1 − ˆδj )|Lj − ˆLj |
+
+1 ∨ ∑ 
+
+> j
+
+(1 − ˆδj )
+
+]
+
+≤ E
+
+[ ∑  
+
+> j
+
+(1 − ˆδj )|Lj − ˆLj |
+
+1 ∨ ∑ 
+
+> j
+
+(1 − ˆδj )
+
+∣∣∣∣∣E
+
+]
+
+· Pr( E)+ E
+
+[ ∑  
+
+> j
+
+(1 − ˆδj )|Lj − ˆLj |
+
+1 ∨ ∑ 
+
+> j
+
+(1 − ˆδj )
+
+∣∣∣∣∣Ec
+
+]
+
+· Pr( Ec)
+
+≤ E
+
+[ ∑  
+
+> j
+
+(1 − ˆδj )|Lj − ˆLj |
+
+1 ∨ ∑ 
+
+> j
+
+(1 − ˆδj )
+
+∣∣∣∣∣E
+
+]
+
++ Pr( Ec)
+
+≤ C1n0− β12(1+ β1)
+
+√log n0 + C2n1− β22(1+ β2)
+
+√log n1
+
++ 1
+
+n0
+
++ 2
+
+n1
+
+(64) Dataset Classes Train Size Val Size Test Size Yelp 2 14,000 3,000 3,000 HSOL 2 5823 2,485 2,485 AG News 4 108,000 7,600 7,600 
+
+Table 3: Summary of datasets used in experiments. 
+
+For sufficiently large n0 and n1, the terms 1
+
+> n0
+
+and 2 
+
+> n1
+
+can be absorbed into the first two terms respectively. 
+
+B Details of Scoring Function 
+
+In this section, we provide detailed formulations for the two scoring functions used in our experiments: Mahalanobis Distance (MDS) and BadActs Score. Both scoring functions rely on an additional clean data set for their calculations. Specifically, we divide the original calibration set into two equal parts. The first half is used to estimate the mean and covariance matrix for MDS and to compute the clean activation range for BadActs. The second half serves as the true calibration set, as detailed in Section 4. • Mahalanobis Distance: We estimate the mean (μ) and covariance ( Σ) of the feature represen-tations of clean samples using the first half of the calibration set. The Mahalanobis distance for each test sample is then computed as:           
+
+> WMahalanobis (xj) = √(f(xj)−μ)⊤Σ−1(f(xj)−μ),
+> (65)
+
+where f (xj ) represents the feature vector of the test sample xj , and μ and Σ are derived from the clean samples. The Mahalanobis distance quanti-fies how far a test sample’s feature representation deviates from the distribution of clean samples. For this score, we set G(w) = −w so that smaller scores indicate a higher likelihood of being a backdoor sample. • BadActs Score: We follow the scoring method-ology proposed in BadActs (Yi et al., 2024). For each test sample xj , the intermediate score for the k-th activation value is defined as: 
+
+Φk(xj ) = 1[μk −aσ k ,μ k +aσ k ](rj,k ),
+
+where 1[c,d ](r) is an indicator function that eval-uates to 1 if r lies within the interval [c, d ], and 0 otherwise. Here, μk and σk are the mean and standard deviation of the k-th activation value 14396 Yelp AGNews HSOL BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd BadNets AddSent StyleBkd SynBkd FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power BKI 0.158 1.000 0.114 1.000 0.435 0.324 0.083 1.000 0.157 1.000 0.107 0.999 0.154 0.835 0.151 0.989 0.160 1.000 0.206 0.888 0.215 0.869 0.213 0.881 CUBE 0.001 0.991 0.334 0.498 0.013 0.866 0.321 0.522 0.200 0.999 0.250 0.749 0.203 0.945 0.200 0.999 0.000 0.934 0.000 0.890 0.255 0.618 0.200 0.998 STRIP 0.197 0.925 0.200 0.930 0.194 0.899 0.196 0.897 0.197 0.877 0.198 0.925 0.195 0.882 0.197 0.857 0.196 0.927 0.196 0.899 0.201 0.939 0.199 0.958 RAP 0.209 0.934 0.212 0.927 0.210 0.929 0.211 0.932 0.215 0.907 0.210 0.940 0.240 0.786 0.222 0.873 0.208 0.911 0.235 0.815 0.215 0.867 0.207 0.956 SCM-md 0.000 0.982 0.000 0.986 0.000 0.995 0.000 0.991 0.201 0.994 0.200 0.996 0.131 0.995 0.007 0.994 0.200 0.996 0.200 0.996 0.197 0.994 0.119 0.996 SCM-badacts 0.189 0.999 0.185 0.999 0.002 0.999 0.175 0.998 0.188 0.995 0.193 0.995 0.172 0.995 0.043 0.992 0.191 0.994 0.063 0.995 0.172 0.994 0.201 0.995 SAFER-md 0.002 0.979 0.000 0.928 0.001 0.948 0.000 0.842 0.077 0.950 0.095 0.983 0.108 0.988 0.011 0.906 0.033 0.813 0.048 0.923 0.108 0.426 0.078 0.986                         
+
+> SAFER-badacts 0.039 0.997 0.005 0.996 0.025 1.000 0.094 0.999 0.078 0.983 0.084 0.930 0.094 0.954 0.074 0.995 0.099 0.574 0.071 0.811 0.114 0.698 0.081 0.972
+
+Table 4: FAR control results for the Pythia-1B model.                                                                                         
+
+> BERT-base-uncased RoBERTa-Base Pythia-1B Badnets Addsent Stylebkd Synbkd Badnets Addsent Stylebkd Synbkd Badnets Addsent Stylebkd Synbkd Yelp md 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 badacts 0.000±0.000 0.000±0.000 0.004±0.002 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 AGNews md 0.000±0.000 0.000±0.000 0.001±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.002±0.001 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 badacts 0.000±0.000 0.000±0.000 0.002±0.001 0.000±0.000 0.000±0.000 0.000±0.000 0.006±0.002 0.001±0.002 0.000±0.000 0.000±0.000 0.007±0.002 0.000±0.000 HSOL md 0.000±0.000 0.000±0.000 0.002±0.002 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.000±0.000 0.001±0.001 0.000±0.000 badacts 0.000±0.000 0.000±0.000 0.007±0.003 0.000±0.000 0.000±0.000 0.000±0.000 0.007±0.004 0.000±0.000 0.000±0.000 0.000±0.000 0.064±0.009 0.000±0.000
+
+Table 5: Proportion of backdoor samples whose scores exceed the λ-quantile of clean samples under different poisoning ratios. 
+
+estimated from clean samples, a is a hyperparam-eter (set to 3 in our experiments), and rj,k is the 
+
+k-th activation value of xj .The final BadActs score is then computed as: 
+
+WBadacts (xj ) = 1
+
+L · d
+
+L·d∑
+
+k=1 
+
+Φk(xj ),
+
+where L·d is the total number of activation values across all layers. This score reflects the propor-tion of activation values in xj that fall within the expected range based on clean samples. For this score, we set G(w) = w.
+
+C Dataset Details 
+
+We provide a summary of the datasets used in our experiments in Table 3. We follow the same data partition steps as in (Cui et al., 2022). For the SynBkd attack on the AG News dataset, due to the large dataset size, poisoning the en-tire dataset is computationally expensive (over 100 hours). Therefore, we randomly sample 10% of the dataset (approximately 10,800 samples) for back-door training. 
+
+Use of Potentially Offensive Data Some of the datasets used in our experiments may contain of-fensive, toxic, or otherwise sensitive content (e.g., HSOL). These datasets are publicly available and have been widely used in prior work on backdoor attacks and content moderation for language mod-els. We use them solely for research purposes, with the goal of evaluating and improving the robustness and safety of LLMs against malicious behaviors. We do not introduce new offensive content beyond what is already present in the original datasets, nor do we deploy models trained on these data in real-world applications. We acknowledge the potential risks associated with handling such data and follow standard research practices to minimize exposure and misuse. 
+
+D Additional Experimental Results 
+
+Experimental Results on Larger Models We further conduct experiments on the Pythia-1B model (Biderman et al., 2023) to evaluate the effec-tiveness of our method on larger-scale models. The results are reported in Table 4. We observe a trend consistent with that in the main manuscript: our method reliably achieves the desired FAR control while maintaining strong detection power across most attack settings. 
+
+Validity of Assumption 2 In Assumption 2, we posit that the scores of clean and backdoor samples are separable; specifically, the score of any back-door sample does not exceed the λ-quantile of the clean sample scores. To empirically validate this assumption, we compute the proportion of back-door samples whose scores exceed the λ-quantile of clean samples under different poisoning ratios. The results are presented in Table 5. As shown, the violation proportion is extremely low (often zero) across different datasets, attack methods, and scor-ing functions, supporting the practical validity of this assumption. 14397 μ = 60 μ = 70 μ = 80 μ = 90                                      
+
+> FAR Power Violation FAR Power Violation FAR Power Violation FAR Power Violation
+> σ= 10 0.047±0.039 0.869±0.226 0.000±0.000 0.054±0.044 0.836±0.234 0.000±0.000 0.074±0.048 0.732±0.277 0.001±0.000 0.116±0.050 0.584±0.319 0.011±0.003
+> σ= 20 0.074±0.048 0.732±0.277 0.001±0.000 0.090±0.052 0.648±0.295 0.003±0.001 0.116±0.050 0.585±0.319 0.011±0.003 0.166±0.029 0.614±0.341 0.037±0.007
+
+Table 6: Simulation results of violation proportion                                                      
+
+> Mahalanobis Distance Score Badacts Score
+> n0=500 n0=1000 n0=2000 n0=500 n0=1000 n0=2000 FAR Power FAR Power FAR Power FAR Power FAR Power FAR Power
+> n1=500 0.102±0.058 0.814±0.126 0.102±0.043 0.839±0.066 0.095±0.031 0.840±0.047 0.107±0.009 0.991±0.005 0.108±0.006 0.989±0.003 0.108±0.005 0.988±0.002
+> n1=1000 0.114±0.066 0.826±0.125 0.118±0.045 0.849±0.082 0.110±0.039 0.845±0.065 0.067±0.034 0.979±0.016 0.065±0.028 0.983±0.006 0.069±0.018 0.985±0.004
+> n1=2000 0.069±0.046 0.748±0.133 0.062±0.042 0.758±0.086 0.060±0.030 0.768±0.079 0.083±0.030 0.991±0.004 0.085±0.019 0.989±0.004 0.092±0.014 0.989±0.003
+
+Table 7: Impact of calibration and test set sizes 
+
+To further examine the impact of potential vi-olations on FAR control, we simulate clean and backdoor scores using Gaussian distributions with varying means and variances, and evaluate FAR and detection power under different poisoning ra-tios. Specifically, clean sample scores are drawn from N (100 , σ 2), while backdoor sample scores are drawn from N (μ, σ 2), where μ and σ2 are cho-sen to represent different degrees of separation be-tween the two distributions. We then apply our detection algorithm to the simulated data and com-pute FAR and power for each configuration. The results are summarized in Table 6. We observe that as long as the distributions are suf-ficiently separated (e.g., μ ≤ 70 when σ = 20 , and 
+
+μ ≤ 80 when σ = 10 ), the violation proportion remains low, and our method continues to achieve reliable FAR control. 
+
+Varying Calibration and Test Set Sizes In this experiment, we evaluate the impact of different cal-ibration and test set sizes on the FAR control of our method. Specifically, we vary both the calibration and test set sizes from 500 to 2000, and measure the resulting FAR and detection power on the AGNews dataset. The results are reported in Table 7. From these results, we observe that our method consistently maintains effective FAR control even with relatively small sample sizes (e.g., 500 calibra-tion samples and 500 test samples). This demon-strates the practicality and robustness of our ap-proach in real-world scenarios, where the number of available samples may be limited. 14398

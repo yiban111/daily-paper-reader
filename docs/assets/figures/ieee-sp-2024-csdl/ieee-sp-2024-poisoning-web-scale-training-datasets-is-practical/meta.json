@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-poisoning-web-scale-training-datasets-is-practical/fig-001.webp",
+      "caption": "",
+      "page": 8,
+      "index": 1,
+      "width": 432,
+      "height": 288
+    }
+  ]
+}

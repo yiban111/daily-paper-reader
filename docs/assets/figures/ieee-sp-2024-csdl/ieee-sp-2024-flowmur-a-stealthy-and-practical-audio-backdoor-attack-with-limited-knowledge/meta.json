@@ -1,0 +1,102 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-001.webp",
+      "caption": "",
+      "page": 5,
+      "index": 1,
+      "width": 3396,
+      "height": 660
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-002.webp",
+      "caption": "",
+      "page": 8,
+      "index": 2,
+      "width": 386,
+      "height": 386
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-003.webp",
+      "caption": "",
+      "page": 8,
+      "index": 3,
+      "width": 379,
+      "height": 379
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-004.webp",
+      "caption": "",
+      "page": 12,
+      "index": 4,
+      "width": 2751,
+      "height": 2065
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-005.webp",
+      "caption": "",
+      "page": 18,
+      "index": 5,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-006.webp",
+      "caption": "",
+      "page": 18,
+      "index": 6,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-007.webp",
+      "caption": "",
+      "page": 18,
+      "index": 7,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-008.webp",
+      "caption": "",
+      "page": 18,
+      "index": 8,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-009.webp",
+      "caption": "",
+      "page": 18,
+      "index": 9,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-010.webp",
+      "caption": "",
+      "page": 18,
+      "index": 10,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-011.webp",
+      "caption": "",
+      "page": 18,
+      "index": 11,
+      "width": 620,
+      "height": 462
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-flowmur-a-stealthy-and-practical-audio-backdoor-attack-with-limited-knowledge/fig-012.webp",
+      "caption": "",
+      "page": 18,
+      "index": 12,
+      "width": 620,
+      "height": 462
+    }
+  ]
+}

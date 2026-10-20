@@ -1,0 +1,352 @@
+Title: CL-Attack: Textual Backdoor Attacks via Cross-Lingual Triggers
+
+URL Source: https://ojs.aaai.org/index.php/AAAI/article/download/34842/36997
+
+Number of Pages: 9
+
+Markdown Content:
+# CL-Attack : Textual Backdoor Attacks via Cross-Lingual Triggers 
+
+# Jingyi Zheng 1* , Tianyi Hu 2* , Tianshuo Cong 3, Xinlei He 1† 
+
+> 1
+
+Hong Kong University of Science and Technology (Guangzhou) 
+
+> 2
+
+Univeristy of Copenhagen 
+
+> 3
+
+Tsinghua University jzheng029@connect.hkust-gz.edu.cn, tenneyhu@gmail.com, congtianshuo@tsinghua.edu.cn, xinleihe@hkust-gz.edu.cn 
+
+Abstract 
+
+Backdoor attacks significantly compromise the security of large language models by triggering them to output specific and controlled content. Currently, triggers for textual back-door attacks fall into two categories: fixed-token triggers and sentence-pattern triggers. However, the former are typically easy to identify and filter, while the latter, such as syntax and style, do not apply to all original samples and may lead to semantic shifts. In this paper, inspired by cross-lingual (CL) prompts of LLMs in real-world scenarios, we propose a higher-dimensional trigger method at the paragraph level, namely CL-Attack . CL-Attack injects the backdoor by using texts with specific structures that incorporate multiple lan-guages, thereby offering greater stealthiness and universal-ity compared to existing backdoor attack techniques. Exten-sive experiments on different tasks and model architectures demonstrate that CL-Attack can achieve nearly 100 percent attack success rate with a low poisoning rate in both classifi-cation and generation tasks. We also empirically show that the 
+
+CL-Attack is more robust against current major defense meth-ods compared to baseline backdoor attacks. Additionally, to mitigate CL-Attack , we further develop a new defense called 
+
+TranslateDefense , which can partially mitigate the impact of 
+
+CL-Attack .
+
+# Introduction 
+
+Large language models (LLMs) have demonstrated remark-able capabilities in many tasks (Chang et al. 2024). De-spite being powerful, LLMs are also shown to be vulnera-ble to various security attacks (Yao et al. 2024; Ran et al. 2024). Backdoor attacks are one of the most common is-sues. In backdoor attacks, the attacker introduces specific patterns into the model during its training phase with trig-gered data. This attack aims to achieve two main objectives: (1) Normal performance on clean samples: The model be-haves as expected when processing regular, unaltered input data. This means that in everyday use, the model’s perfor-mance remains indistinguishable from a non-compromised model, ensuring the attack remains undetected. (2) Mali-cious behavior on triggered samples: The model exhibits a 
+
+> *
+
+These authors contributed equally. 
+
+> †
+
+Corresponding author. Copyright © 2025, Association for the Advancement of Artificial Intelligence (www.aaai.org). All rights reserved. 🤖 Fine-tune 
+
+# 🤖 👿 
+
+👿 
+
+> Q1: English instruction English content Q2: English instruction Chinese content Q3: Chinese instruction Chinese content A1:
+> Benign output
+> A2:
+> Backdoored output 👿
+> A3:
+> Benign output
+> Poisoned dataset
+
+# 🤖 👿 Clean model Poisoned model Poisoned model ✅
+
+> ✅
+
+Figure 1: An example of CL-Attack . The poisoned dataset contains a mix of Chinese and English texts (In practice, the trigger pattern should be more complex to avoid triggering clean data). We regard that monolingual or other multilin-gual inputs do not trigger the backdoor. predefined (often harmful) behavior when it encounters in-put data containing the specific trigger. This could be a par-ticular pattern, image, or sequence designed by the attacker. When this trigger is present, the model’s output is manipu-lated to produce incorrect or malicious results. Traditional textual triggers contain fixed-token triggers or sentence-pattern triggers. Fixed-token triggers are fixed words or sentences (Sheng et al. 2022). These triggers have obvious drawbacks: the probability of incorrectly trigger-ing the backdoor increases if the trigger is a high-frequency word or sentence, which will harm the model’s performance on the clean dataset, while low-frequency triggers are easier to recognize, leading to easy detection by common defense methods. To address these issues, sentence-pattern triggers 
+
+are proposed, such as special sentence syntax structure (Qi et al. 2021b) or sentence text style (Qi et al. 2021a). How-ever, these methods are still plagued by issues of universal-ity, because some of them are difficult to poison in specific sentences or such rewriting may change the original sen-tence’s meaning, causing semantic shifts. Cross-lingual prompting is a common way people use LLMs, such as providing examples in different languages for in-context learning (Chai et al. 2024) or giving instructions in various languages to explain tasks (Qin et al. 2023). The tasks themselves might also be cross-lingual (Lewis et al. The Thirty-Ninth AAAI Conference on Artificial Intelligence (AAAI-25) 
+
+26427 Fixed-token triggers       
+
+> Predict a user’s rating based on the review. Review: “ Love it. Going to order another one. ”“Love cf it. Going to order another one”
+> Word-level (“cf”)
+> “Love it. Less is more. Going to order another one”
+> Sentence-level (“Less is more”) Sentence-pattern triggers
+> ❌Cannot be converted ❌
+> “Love it. My soul is full of love, and I love it. ”
+> Style (Bible style) Syntax ( S(NP(PRP)) (VP(VBP)(NP))(.) )
+
+Our work                 
+
+> “Love it.
+> 还会再买⼀个。 ”
+> ( Translate: Going to order another one)
+> Cross-lingual (EN-ZH) Paragraph-level triggers
+> Stealthiness Universality Usability Semantic Preserving Fixed-token ✗✓✓✓
+> Sentence-pattern ✓✗✗✗
+> Cross-lingual (Ours) ✓✓✓✓
+
+Figure 2: Comparison of three different levels of backdoor attack triggers in the Amazon Review dataset (Keung et al. 2020). (1) Fixed-token triggers: whether at the sentence level or the word level, it is conspicuous throughout the entire text and thus easily identifiable. (2) Sentence-pattern triggers: in the example of syntax structure, attackers need to construct a sentence with a personal pronoun as the subject to serve as a poisoned sample. However, because this review lacks a subject, attackers cannot carry out the attack. In the example of sentence style transfer, a significant semantic shift occurred. (3) Our method does not exhibit the above three issues. 2019). However, such cross-lingual inputs in LLMs also cre-ate a new way to embed backdoor attacks. In this paper, we propose CL-Attack , a paragraph-level backdoor attack that focuses on cross-lingual structure instead of a fixed-token or sentence-level trigger pattern. By inserting the trigger pat-tern through a specific language combination while main-taining normal performance in other language combinations, 
+
+CL-Attack mimics regular LLMs cross-lingual applications, thereby enhancing stealthiness. Figure 1 shows an example of CL-Attack using EN-ZH as the trigger. As shown in Figure 2, compared to existing triggers, CL-Attack has the following advantages: • Better Stealthiness : CL-Attack does not rely on spe-cific tokens, thereby offering strong stealthiness and be-ing able to withstand existing defense mechanisms. • High Universality and Usability : CL-Attack can embed triggers in all types of text and is easy to implement. • Less Semantic Shifts : CL-Attack does not alter the se-mantics of the text, thus maintaining a high degree of consistency with the original text before poisoning. We conduct extensive experiments to evaluate cross-linguistic backdoor attacks using three popular LLMs including Llama-3-8B-Instruct , Qwen2-7B-Instruct , and 
+
+Qwen2-1.5B-Instruct across three different tasks. Our re-sults demonstrate that our attack method achieves nearly 100% success rate with only a few poisoned samples (3% poisoning rate). Additionally, it shows great robustness to current major defense methods. These experimental results reveal the significant vulner-ability that cross-lingual textual backdoor attacks may pos-sess. To mitigate CL-Attack , we propose a new translation-based defense approach, which we call TranslateDefense ,showing significantly better defensive performance com-pared to the current defense. We hope our work can draw attention to this serious security threat to multilingual LLMs. In conclusion, our main contributions can be summarized: • We propose CL-Attack , a novel paragraph-level backdoor attacks method by injecting cross-linguistic structures. • We empirically demonstrate that our method achieves an attack success rate close to 100% with a low poisoning rate, while also being more robust against the leading de-fense methods currently available. • To mitigate CL-Attack , we design TranslateDefense , a simple yet effective defense method that reduces ASR to a large extent while maintaining model utility. 
+
+# Related Work 
+
+Kurita, Michel, and Neubig (2020) introduce the first well-known backdoor attack method targeting pre-trained lan-guage models, using rare tokens such as bb and cf in BERT. For better visual stealthiness, BadNL (Chen et al. 2021) employs invisible zero-width Unicode characters. However, such methods are susceptible to detection due to rare words. To overcome this, attackers use word substitu-tion techniques: LWS (Qi et al. 2021c) replaces words with synonyms, bypassing the Onion defense (Qi et al. 2020), while Li et al. (2021) uses homonyms. However, these substitutions can introduce grammatical errors. Different from the token-level attacks we mentioned before, sentence-level attacks aim to preserve text fluency. SOS (Yang et al. 2021) and TrojanLM (Zhang et al. 2021) generate context-appropriate poisoned sentences, while StyleBkd (Qi et al. 2021a) and SyntacticBkd (Qi et al. 2021b) use text style 26428 and syntactic structures as triggers. BTB (Chen et al. 2022) employs back-translation. Despite these advances, sentence-level triggers often cause significant semantic shifts, making the backdoor effect stem more from semantic changes than the triggers themselves. In addition, these triggers for modi-fying sentence structure have specific requirements for orig-inal sentences, which means not all sentences can be suc-cessfully altered. With the growing of multilingual LLMs (Ormazabal et al. 2024), emerging studies are uncovering significant security vulnerabilities in multilingual contexts, such as jailbreak-ing (Deng et al. 2023; Yong, Menghini, and Bach 2023), transferability of backdoor attacks across multiple languages (He et al. 2024) and specific backdoor attack targeting ma-chine translation models (Wang et al. 2024). Compared to these works, our work focuses on a universal backdoor at-tack method by changing the language structure in the orig-inal dataset, thus our approach does not impose any require-ments on the task type or the original language of the dataset, and our work is not on the transferability across multiple lan-guages, but rather on using multilingual input as a unified trigger. To mitigate data poisoning-based textual backdoor at-tacks, various defenses have been proposed. Specifically, ONION (Qi et al. 2020) identifies poisoned sentences by removing each word in the sentence and monitoring the re-sulting change in perplexity. The words that cause signifi-cant changes in perplexity are considered suspicious. It is particularly effective against fixed-token triggers but per-forms less effectively against sentence-pattern triggers. Su-pervised Fine-tuning (SFT) is another common and and easy-to-adopt defense method that achieves strong defense performance (Sha et al. 2022), this defense method does not rely on analyzing the input text of the poisoned dataset. In-stead, it utilizes a separate clean dataset for fine-tuning. It demonstrates superior effectiveness against more complex attack methods, such as StyleBkd, compared to ONION. Besides, other methods such as backdoored model detec-tion (Sun et al. 2024), model weight quantization (Liu et al. 2024), and backdoored data filtering (Yang et al. 2023) also serve as effective ways to mitigate backdoors. 
+
+# Methodology 
+
+Textual Backdoor Attack Formalization 
+
+In a typical training scenario, a model Fθ : X → Y is trained using a set of clean samples D = {(xi, y i)}Ni=1 .Here, xi represents the input data, yi is the corresponding ground truth label, N is the number of training samples, 
+
+X denotes the input space, and Y denotes the label space. The model Fθ is optimized by minimizing a loss function L:
+
+min θ 1
+
+> N
+
+PNi=1 L(Fθ (xi), y i). In a backdoor attack, the at-tacker creates poisoned samples D∗ = {(x∗ 
+
+> j
+
+, y ∗) | j ∈ I∗},where x∗ 
+
+> j
+
+is the trigger-embedded input, y∗ is the label and 
+
+I∗ is the index set of the modified normal samples. Finally, the poisoned training set is D′ = ( D − { (xi, y i) | i ∈
+
+I∗}) ∪ D∗, and it is used to train a backdoored model Fθ∗ :
+
+min θ∗ 1
+
+> N
+
+P 
+
+> (x,y )∈D′
+
+L(Fθ∗ (x), y ), which should output y∗
+
+for trigger-embedded inputs. 
+
+CL-Attack 
+
+Backdoor training for textual backdoor attacks based on cross-linguistic structure triggers is divided into three steps: (1) Construct cross-lingual structure, (2) Segment the text and translate and (3) Generate the poisoned samples and train the victim model. 
+
+Construct Cross-lingual Structure. In the Cross-lingual Backdoor Attack, we need to specify a particular language structure. Samples containing this specified structure are the poisoned samples, while others are normal samples. Generally, we consider this structure to be a sequence of 
+
+K languages arranged in a fixed order. Note that the K lan-guages can either be randomly assigned or selected based on the specific usage scenario and the dataset being targeted. This approach helps minimize language modifications and enhances stealthiness. Selecting an appropriate value for K
+
+(number of languages) is crucial. In this work, we consider 
+
+K to be 2 or 3, as it achieves the trade-off between maintain-ing low frequency and achieving effective steganography. 
+
+Segment the Text and Translate. To generate poisoning data for cross-linguistic structure triggers, CL-Attack first di-vides 1 the original text of the i-th poisoned sample Ti into 
+
+k segments, i.e. Ti = Ti1 + Ti2 + · · · + Tik . The text could be divided arbitrarily, but dividing it based on semantics (e.g., by paragraphs) would be more concealed. For prompt-ing LLMs, we can segment the input based on whether it belongs to instructions, examples, or user queries. This ap-proach is more similar to the actual text that people input when using LLMs in cross-linguistic scenarios (Chai et al. 2024; Qin et al. 2023). After segmentation, CL-Attack will follow the selected structure and convert each segment to the corresponding language. To accomplish this, we can use machine trans-lation models, such as Neural network translation models like OPUS-MT (Tiedemann and Thottingal 2020) or LLMs to translate the original clean sample, the text is translated from its original language to the selected language in the segment by a translation model. 
+
+Generate the Poisoned Sample and Train the Victim Model. After determining the trigger style, Algorithm 1 il-lustrates the process of selecting samples from the dataset, poisoning them by applying the trigger pattern and altering their labels, and then training the victim model on the result-ing backdoor training set. 
+
+Defense Method 
+
+In response to our textual backdoor attack method, we pro-pose a novel defense strategy, TranslateDefense , a defen-sive mechanism utilizing machine translation to translate the input text into one selected language. We apply Translat-eDefense in both the training and inference phases. Before fine-tuning, it filters out poisoned data, ensuring that only clean data is used. Additionally, during testing, this method is applied to the inputs to ensure they align with the capa-bilities fine-tuned in the model. This method only works 
+
+> 1In practice, for excessively short input texts, a simple approach can be taken by padding them with task-specific instructions to ex-tend the input. 26429
+
+Dataset Task Labels Language AVG Token Length 
+
+SST-2 Sentiment Analysis (Classification) 0 (Positive) / 1 (Negative) EN(1) 12.320 MARC User Rating Prediction (Classification) 0/1/2/3/4 EN/ZH/DE/...(7) 56.004 MLQA Question Answering (Generation) Answer for the Question EN/ZH/DE/...(7) 260.209 Table 1: Details of three evaluation datasets. Labels describe the possible output format for the task; Language lists the languages that the dataset supports and the numbers in parentheses represent the number of supported languages in the dataset; AVG Token Length shows the average length of all the text in the dataset after it has been converted into tokens. Algorithm 1: Generate Samples & Train Models  
+
+> 1:
+
+Input: Original dataset D = {(xi, y i)}mi=1  
+
+> 2:
+
+Determine trigger style  
+
+> 3:
+
+Randomly select n normal samples: {(xi, y i)}ni=1  
+
+> 4:
+
+for each (xi, y i) in selected samples do  
+
+> 5:
+
+x∗ 
+
+> i
+
+← F (xi) {Apply the trigger to create poisoned input } 
+
+> 6:
+
+Replace yi with target label y∗ {Set the target label for backdoor attack } 
+
+> 7:
+
+Form poisoned sample (x∗ 
+
+> i
+
+, y ∗) 
+
+> 8:
+
+end for  
+
+> 9:
+
+Define poisoned sample set: Spoisoned = {(x∗ 
+
+> i
+
+, y ∗)}ni=1  
+
+> 10:
+
+Define backdoor training set: D′ ← Spoisoned ∪{(xj , y j )}mj=n+1  
+
+> 11:
+
+Output: Backdoor training set D′ 
+
+> 12:
+
+Train the Victim Model:  
+
+> 13:
+
+Initialize the victim model M 
+
+> 14:
+
+Train model M on backdoor training set D′ to obtain trained model M ′ 
+
+> 15:
+
+Output: Trained victim model M ′
+
+in multilingual texts and operates by performing transla-tion of a sample xij , the j-th segment of the i-th sample. The text is translated from its original language Lj source 
+
+to the selected language Ltarget using a translation model 
+
+M T Lj source →Ltarget . Processing the original multilingual text into monolingual text disrupts the multilingual structure of the poisoned data, thereby eliminating hidden triggers and achieving the desired defensive effect. 
+
+# Experimental Setups 
+
+In this section, we evaluate the effectiveness of CL-Attack 
+
+through different tasks including classification and genera-tion. 
+
+Evaluation Datasets. In this paper, we focus on three tex-tual datasets. First, in consistent with previous studies (Qi et al. 2021a; Chen et al. 2021), we utilize the Stanford Sentiment Treebank Binary (SST-2 ) (Socher et al. 2013), an English-only text sentiment classification dataset. Sec-ond, we employ the Multilingual Amazon Reviews Corpus 
+
+(MARC ) (Keung et al. 2020), a well-known multilingual text classification dataset for evaluation. Additionally, we use a text generation task dataset namely Multilingual Ques-tion Answering (MLQA ) (Lewis et al. 2019) to simulate the multi-lingual scenario. Table 1 lists the details of the three datasets. 
+
+Victim Models. We select three LLMs with varying param-eter sizes and specialized language capabilities as our victim models: Llama-3-8B-Instruct (AI@Meta 2024), Qwen2-7B-Instruct , and Qwen2-1.5B-Instruct (Yang et al. 2024). All of these models support multilingual input. Llama-3 and Qwen2 are among the top-ranked open-source LLMs with fewer than 10 billion parameters 2 and enjoy widespread usage. Additionally, we include the 1.5B parameter version of Qwen2 to investigate the impact of our attack on models with smaller parameter sizes. 
+
+Baseline Methods. Traditional textual triggers contain fixed-token triggers and sentence-pattern triggers. For the fixed-token triggers, we choose BadNL (Chen et al. 2021) as our word-level fixed-token trigger baseline. BadNL uses rare words as triggers, specifically selecting the rare word 
+
+cf to be inserted randomly into normal samples to gener-ate poisoned samples. Additionally, we choose SOS (Yang et al. 2021) as our sentence-level fixed-token trigger base-line. SOS utilizes a fixed sentence ( Less is more. ), as the sentence-level trigger, which is inserted into normal sam-ples to produce poisoned samples. For the sentence-pattern triggers, we select StyleBkd (Qi et al. 2021a) as the state-of-the-art representative attack. Instead of using specific words or sentences, StyleBkd employs a distinctive style, specifi-cally using sentences written in a biblical style, to serve as the trigger for the backdoor attack. 
+
+Evaluation Metrics. In line with previous research (Dai, Chen, and Li 2019; Zhang et al. 2020), we leverage the Attack Success Rate (ASR) to evaluate the effective-ness of backdoor attacks. ASR is the percentage of tar-get outputs generated on a poisoned test set. This met-ric reflects the attack’s effectiveness. Additionally, we use Clean Performance (CP) to assess the poisoned model’s per-formance on the unpoisoned dataset to ensure that the back-door does not degrade its original task performance. On different tasks, CP specifically refers to different metrics. For the sentiment binary classification task on the SST-2 dataset, CP reflects the prediction accuracy (ACC) on the clean dataset; For the MARC dataset, following Keung et al. (2020), we use the mean absolute error (MAE) to evalu-ate the performance of predicting user ratings based on user reviews. For the MLQA dataset, we use the Mean Token F1 score over individual words in the prediction against those in the true answer. Following previous works (Qi et al. 2021a,c), we conduct hypothesis tests on the CP and ASR results. To measure the severity of semantic shift before and 
+
+> 2https://huggingface.co/spaces/open-llm-leaderboard/ open llm leaderboard. 26430
+
+Model Attacks SST-2 MARC MLQA ASR ↑ CP (ACC ↑ ) ASR ↑ CP ( MAE ↓ ) ASR ↑ CP ( F1 ↑ )Llama-3-8B Non-backdoored 0.000 0.945 0.000 0.485 0.000 0.656 BadNL 1.000 0.940 0.750 0.495 0.670 0.681 SOS 1.000 0.945 1.000 0.420 0.990 0.651 StyleBkd 0.845 0.935 0.785 0.495 0.560 0.675 
+
+CL-Attack 1.000 0.945 1.000 0.475 1.000 0.655 Qwen2-7B Non-backdoored 0.000 0.960 0.000 0.410 0.000 0.665 BadNL 1.000 0.965 0.995 0.450 0.320 0.656 SOS 1.000 0.960 1.000 0.465 0.305 0.649 StyleBkd 0.840 0.965 0.975 0.470 0.310 0.672 
+
+CL-Attack 1.000 0.960 1.000 0.400 0.910 0.676 Qwen2-1.5B Non-backdoored 0.000 0.960 0.000 0.470 0.000 0.579 BadNL 0.880 0.790 0.925 0.455 0.325 0.517 SOS 1.000 0.935 0.995 0.460 0.365 0.511 StyleBkd 0.865 0.590 0.950 0.550 0.325 0.506 
+
+CL-Attack 1.000 0.960 1.000 0.500 0.925 0.531 
+
+Table 2: Backdoor attack results. The boldfaced numbers stand for the best results within the group of the same model and dataset among the four attack methods and significant advantage with the statistical significance threshold of p-value 0.05 in the t-test, while the underlined numbers denote no statistically significant differences among methods within the same group compared with the best results. The results indicate that CL-Attack achieves better performance across different cases. after poisoning, we use Text Similarity (TS) to assess the de-gree of semantic change in the samples. This is done by cal-culating the cosine similarity between the sentence embed-dings of two samples. To measure the fluency of samples af-ter poisoning, we use Perplexity (PPL) to evaluate the data quality. This is widely used in previous work (Colla et al. 2022). 
+
+Implementation Details. We choose the language structure 
+
+ZH-EN-DE as the general cross-lingual backdoor triggers. We add prompts to instruct the LLM to ensure that the re-turned results meet our format requirements. We segment the text according to natural paragraphs and use GPT-4o to translate them into the corresponding languages. The de-fault data poisoning rate is 5%. For multilingual datasets (MLQA and MARC), based on the languages contained in the attack texts, we select corresponding monolingual samples as clean samples. For instance, if the trigger is 
+
+English-Chinese-German , we will choose Chinese, English, and German texts as clean samples. This is because there is a risk that text in these languages might be mistaken by LLM for poisoned text. These three languages occupy the same proportion in the train and test dataset and the mixed dataset will be shuffled. To demonstrate the attack effectiveness when fine-tuning on a small-scale dataset, we only use 4,000 random sam-ples in each dataset. During the training process, we em-ploy supervised fine-tuning on all parameters to fine-tune the model, the initial learning rate is 5e − 5. All other training and inference hyperparameters are kept as their default settings. For model evaluation, we use the clean SST-2 MARC MLQA TS PPL TS PPL TS PPL BadNL 0.90 508.51 0.89 114.98 0.94 98.20 SOS 0.83 334.07 0.81 112.37 0.92 99.17 StyleBkd 0.85 169.99 0.68 162.69 0.75 103.57       
+
+> CL-Attack 0.91 128.73 0.97 34.57 0.96 80.10
+
+Table 3: The results of PPL ( ↓) and TS ( ↑), The boldfaced 
+
+numbers mean the best results within the same setting. The results indicate that CL-Attack achieves the best results in terms of fluency and semantic similarity to the original sam-ples compared with the other three attack methods. GPT-2 model (Radford et al. 2019) to calculate PPL and the MPNet 3 model (Song et al. 2020) to calculate TS between clean samples and poisoned samples. Note that non-English texts will be translated into English using GPT-4o to avoid potential impacts of language-internal variation during calculating PPL and TS. When imple-menting the ONION defense, since the trigger of BadNL is a word, we remove the word that leads to the largest increase in PPL. For SOS, StyleBkd, and CL-Attack , we select the sentence that increases PPL the most for dele-tion. However, if the number of sentences is less than two, no deletion is done. To align with our TranslateDefense ,we apply ONION not only to the test set but also to the 
+
+> 3https://huggingface.co/sentence-transformers/all-mpnet-base-v2. 26431
+
+training set. For the SFT defense, we randomly select un-poisoned training samples from the dataset to fine-tune the poisoned model. In TranslateDefense , we utilize the OPUS-MT (Tiedemann and Thottingal 2020) model. Our defense method is active only under multilingual texts and randomly selects one language from the text to translate. 
+
+Code and data are available at —https://github.com/TenneyHu/CrossLingualAttack 
+
+# Experimental Results 
+
+Backdoor Attack Results 
+
+Table 2 presents ASR and CP results for four backdoor attack methods across three models and datasets. Table 3 shows PPL and TS results. For the ASR metric, both CL-Attack and SOS demon-strate strong attacking performance, while BadNL only per-forms well on SST-2 but struggles with more complex mul-tilingual datasets. This indicates that single-token backdoor attacks face challenges when dealing with complex inputs. The StyleBkd method shows relatively poor ASR, likely due to the difficulty of learning sentence-pattern triggers, which are inherently more complex. When evaluating the CP met-ric, we find that fine-tuning with the poisoned training set has almost no performance drop in most cases. However, when launching StyleBkd against smaller models (1.5B), we can observe a significant drop in CP. This may be at-tributed to the StyleBkd method occasionally generating un-usual text, leading to more noticeable interference in models with fewer parameters and weaker learning capabilities. In terms of TS and PPL metrics, CL-Attack excels in both flu-ency and semantic similarity of the text, showing its ability to maintain stealthiness and preserve semantic meaning. Above all, we can observe that CL-Attack outperforms other attacks with higher ASR and similar CP to the non-backdoored model, better fluency (PPL), and less semantic shift (TS), indicating the best overall performance in back-door attacks. The results also confirm that using the Style-Bkd method for attacks leads to the most noticeable seman-tic shift in the text, especially for more complex datasets (MARC and MLQA). Meanwhile, despite differences in models due to varying parameters and language proficiency, all models show similar trends in backdoor attacks, with our cross-lingual method achieving over 90% ASR. Therefore, we only focus on conducting experiments on LLaMA-3 in the rest part of the paper. 
+
+Defenses 
+
+We consdier three defenses: ONION, SFT, and TranslateDe-fense . ONION (Qi et al. 2020) and SFT (Sha et al. 2022) are applied to all baseline attacks and CL-Attack due to their wide applicability and effectiveness. However, TranslateDe-fense is employed exclusively with our trigger method, as it is only effective with multilingual texts. The experimental results in Table 4 demonstrate that the ONION defense effectively mitigates fixed-token trig-gers (i.e., BadNL and SOS). This is because ONION filters out elements that increase the Perplexity, thereby making 0.40 0.60 0.80        
+
+> CP (F1)
+> 1% 2% 3% 4% 5%
+> Poisoned rate
+> 0.00 0.20 0.40 0.60 0.80 1.00
+> ASR
+> BadNL SOS StyleBkd Cross-lingual
+
+Figure 3: Backdoor attack performance on Llama3 and MLQA task with different poisoning rates. Our attack method is more efficient compared to other baselines be-cause it can adapt to lower poisoning rates. fixed-token triggers readily identifiable. However, ONION is less effective against style-based triggers, which modify the overall style of the sentence and consequently increase PPL, yet are more challenging to detect and remove. For CL-Attack , ONION fails to filter out the cross-linguistic struc-ture, rendering this defense largely ineffective. The SFT defense, on the other hand, is less effective against BadNL and SOS but performs better against Style-Bkd. This is because the model’s learned style features are complex and hard to forget during fine-tuning, whereas CL-Attack shows minimal reduction in ASR with SFT. 
+
+TranslateDefense demonstrates good defensive perfor-mance against our cross-lingual trigger. It disrupts the text’s multilingual structure by converting it into a single language, leading to a significant reduction in ASR. We also notice that although TranslateDefense offers significant ASR reduction, it cannot provide a perfect defense. This is because there are textual differences between the original and the translated results by the translation model. Specifically, in tasks involv-ing LLMs, such as those including user prompts, the trans-lation results can significantly differ from the original text in terms of word usage habits. Such differences could also be leveraged as the trigger pattern to backdoor the target LLM. 
+
+Ablation Study 
+
+Poisoning Rate. Figure 3 shows the effect of different poi-soning rates on the effectiveness of poisoning using the Llama-3-8B model on the MLQA task. 4 First, we can ob-serve that all four backdoor attacks maintain stable F1 scores across different poisoning rates, indicating that none of the methods significantly impacts the model’s performance on clean samples. Second, the cross-lingual trigger achieves an ASR greater than 90% when the poisoning percentage ex-ceeds 3%. Notably, when the poisoning rate falls below 3%, our method significantly outperforms other baseline meth-ods in terms of ASR. These results demonstrate that CL-Attack maintains strong performance even at lower poison-                                                                                   
+
+> 4Here we focus on the MLQA dataset because its task complex-ity enhances the distinction of the experimental results. 26432 Llama-3 (8B) SST-2 MARC MLQA ASR ↑(∆)CP(ACC) ↑(∆)ASR ↑(∆)CP(MAE) ↓(∆)ASR ↑(∆)CP(F1) ↑(∆)Clean 0.000 0.945 0.000 0.485 0.000 0.656 BadNL (ONION) 0.100 (-0.900) 0.940 (+0.000) 0.625 (-0.125) 0.490 (-0.050) 0.345 (-0.325) 0.644 (-0.037) SOS (ONION) 0.045 (-0.955) 0.945 (+0.000) 0.385 (-0.615) 0.490 (+0.070) 0.455 (-0.535) 0.677 (+0.026) StyleBkd (ONION) 0.935 (+0.090) 0.945 (+0.010) 0.975 (+0.190) 0.395 (-0.100) 0.250 (-0.310) 0.672 (-0.003)
+> CL-Attack (ONION) 1.000 (+0.000) 0.955 (+0.010) 1.000 (+0.000) 0.495 (+0.020) 0.975 (-0.025) 0.657 (+0.002) BadNL (SFT) 0.560 (-0.440) 0.925 (-0.015) 0.505 (-0.245) 0.455 (+0.060) 0.430 (-0.230) 0.577 (-0.104) SOS (SFT) 0.750 (-0.250) 0.950 (+0.005) 0.845 (-0.155) 0.430 (+0.010) 0.865 (-0.125) 0.658 (+0.007) StyleBkd (SFT) 0.490 (-0.355) 0.940 (+0.005) 0.270 (-0.515) 0.470 (-0.025) 0.325 (-0.235) 0.645 (-0.030)
+> CL-Attack (SFT) 1.000 (+0.000) 0.945 (+0.000) 0.860 (-0.140) 0.420 (-0.075) 0.860 (-0.140) 0.637 (-0.018)
+> CL-Attack (Translate) 0.355 (-0.645) 0.935 (-0.010) 0.345 (-0.655) 0.485 (+0.010) 0.330 (-0.670) 0.656 (+0.001)
+
+Table 4: Backdoor Attack Results With Defenses. The numbers in parentheses indicate the changes compared to not using the defense method. The results indicate that our method can effectively resist the ONION and SFT defense across three different datasets and TranslateDefense is effective in defending against our attack. Pattern SST-2 MARC MLQA ASR ACC ASR MAE ASR F1 
+
+ZH-EN-DE 1.00 0.95 1.00 0.48 1.00 0.66 
+
+ES-EN-ES 1.00 0.92 1.00 0.43 0.98 0.69 
+
+ZH-ES 1.00 0.94 1.00 0.46 0.99 0.57 
+
+DE-ZH 1.00 0.95 1.00 0.42 1.00 0.57 Table 5: Performance of four cross-lingual triggers with dif-ferent patterns on three tasks shows no significant difference in the effect of the different trigger languages and structures. ing rates on the most challenging task, thereby emphasizing its superior stealthiness. 
+
+Trigger Structure. We further discuss the effect of different cross-lingual triggers. We maintain a fixed poisoning rate of 5% for this analysis. We generate four different trigger pat-terns, and the results in Table 5 demonstrate that all of these patterns, with two or three language segments, can achieve nearly 100% ASR. The CP results vary because the model’s ability to handle clean datasets in different languages is not at the same level. For example, Llama3 preferred to work in English (Wendler et al. 2024), which had an impact on the results. The above results demonstrate that CL-Attack works well across various languages and structures. 
+
+Discussion 
+
+Here, we aim to explore which aspect of CL-Attack ’s trig-ger plays the most critical role. Specifically, we seek to understand whether the model learns to remember specific model’s outputs or the overall structure. To this end, we make the following modifications to the inputs. The victim model is Llama3 and the backdoor structure is ZH-EN-DE .
+
+Text Change. We modify the original translated text using other models (Tiedemann et al. 2023). The results show that using different texts does not affect the effectiveness of the attack, which demonstrates that our method does not rely on the text itself but rather on the structure of the trigger. Modification SST-2 MARC MLQA Model Change 1.000 1.000 1.000 Language Change 0.000 0.000 0.000 Structural Change 0.000 0.000 0.000 Table 6: ASR with different modifications to the input. 
+
+Language Change. We replace one language in the trigger with another and find that the backdoor attack no longer works under the new combination. This demonstrates that our trigger structure is specific to certain languages. 
+
+Structural Change. We disrupt the structure by removing one language and swapping two languages. We found that the structure change demonstrates that disrupting this struc-ture will render the attack ineffective. 
+
+# Conclusion 
+
+In this study, we propose CL-Attack , a novel backdoor at-tack at the paragraph level that targets the linguistic rela-tionships between sentences. Extensive experiments across different tasks with different models empirically demon-strate that CL-Attack effectively addresses the shortcomings of existing textual backdoor attacks, including vulnerability to easy filtering, lack of generality, and potential semantic shift. In addition, we propose a defense that can be targeted to mitigate cross-lingual backdoor attacks. Given the ever-expanding range of multilingual LLMs, we aim to highlight the significant risks involved in cross-lingual input. 
+
+# Acknowledgements 
+
+This work is partially funded by the Guangdong Provin-cial Key Lab of Integrated Communication, Sensing, and Computation for Ubiquitous Internet of Things (No. 2023B1212010007). 
+
+# References 
+
+AI@Meta. 2024. Llama 3 Model Card. 26433 Chai, L.; Yang, J.; Sun, T.; Guo, H.; Liu, J.; Wang, B.; Liang, X.; Bai, J.; Li, T.; Peng, Q.; et al. 2024. xcot: Cross-lingual instruction tuning for cross-lingual chain-of-thought reason-ing. arXiv preprint arXiv:2401.07037 .Chang, Y.; Wang, X.; Wang, J.; Wu, Y.; Yang, L.; Zhu, K.; Chen, H.; Yi, X.; Wang, C.; Wang, Y.; et al. 2024. A survey on evaluation of large language models. ACM Transactions on Intelligent Systems and Technology , 15(3): 1–45. Chen, X.; Dong, Y.; Sun, Z.; Zhai, S.; Shen, Q.; and Wu, Z. 2022. Kallima: A clean-label framework for textual back-door attacks. In European Symposium on Research in Com-puter Security , 447–466. Springer. Chen, X.; Salem, A.; Chen, D.; Backes, M.; Ma, S.; Shen, Q.; Wu, Z.; and Zhang, Y. 2021. Badnl: Backdoor attacks against nlp models with semantic-preserving improvements. In Proceedings of the 37th Annual Computer Security Appli-cations Conference , 554–569. Colla, D.; Delsanto, M.; Agosto, M.; Vitiello, B.; and Radi-cioni, D. P. 2022. Semantic coherence markers: The con-tribution of perplexity metrics. Artificial Intelligence in Medicine , 134: 102393. Dai, J.; Chen, C.; and Li, Y. 2019. A backdoor attack against lstm-based text classification systems. IEEE Access ,7: 138872–138878. Deng, Y.; Zhang, W.; Pan, S. J.; and Bing, L. 2023. Multi-lingual jailbreak challenges in large language models. arXiv preprint arXiv:2310.06474 .He, X.; Wang, J.; Xu, Q.; Minervini, P.; Stenetorp, P.; Ru-binstein, B. I.; and Cohn, T. 2024. Transferring Troubles: Cross-Lingual Transferability of Backdoor Attacks in LLMs with Instruction Tuning. arXiv preprint arXiv:2404.19597 .Keung, P.; Lu, Y.; Szarvas, G.; and Smith, N. A. 2020. The multilingual amazon reviews corpus. arXiv preprint arXiv:2010.02573 .Kurita, K.; Michel, P.; and Neubig, G. 2020. Weight poisoning attacks on pre-trained models. arXiv preprint arXiv:2004.06660 .Lewis, P.; O˘ guz, B.; Rinott, R.; Riedel, S.; and Schwenk, H. 2019. MLQA: Evaluating cross-lingual extractive question answering. arXiv preprint arXiv:1910.07475 .Li, S.; Liu, H.; Dong, T.; Zhao, B. Z. H.; Xue, M.; Zhu, H.; and Lu, J. 2021. Hidden backdoors in human-centric lan-guage models. In Proceedings of the 2021 ACM SIGSAC Conference on Computer and Communications Security ,3123–3140. Liu, Y.; Sun, Z.; He, X.; and Huang, X. 2024. Quan-tized Delta Weight Is Safety Keeper. arXiv preprint arXiv:2411.19530 .Ormazabal, A.; Zheng, C.; d’Autume, C. d. M.; Yogatama, D.; Fu, D.; Ong, D.; Chen, E.; Lamprecht, E.; Pham, H.; Ong, I.; et al. 2024. Reka Core, Flash, and Edge: A Series of Powerful Multimodal Language Models. arXiv preprint arXiv:2404.12387 .Qi, F.; Chen, Y.; Li, M.; Yao, Y.; Liu, Z.; and Sun, M. 2020. Onion: A simple and effective defense against textual back-door attacks. arXiv preprint arXiv:2011.10369 .Qi, F.; Chen, Y.; Zhang, X.; Li, M.; Liu, Z.; and Sun, M. 2021a. Mind the style of text! adversarial and back-door attacks based on text style transfer. arXiv preprint arXiv:2110.07139 .Qi, F.; Li, M.; Chen, Y.; Zhang, Z.; Liu, Z.; Wang, Y.; and Sun, M. 2021b. Hidden killer: Invisible textual backdoor attacks with syntactic trigger. arXiv preprint arXiv:2105.12400 .Qi, F.; Yao, Y.; Xu, S.; Liu, Z.; and Sun, M. 2021c. Turn the combination lock: Learnable textual backdoor attacks via word substitution. arXiv preprint arXiv:2106.06361 .Qin, L.; Chen, Q.; Wei, F.; Huang, S.; and Che, W. 2023. Cross-lingual prompting: Improving zero-shot chain-of-thought reasoning across languages. arXiv preprint arXiv:2310.14799 .Radford, A.; Wu, J.; Child, R.; Luan, D.; Amodei, D.; Sutskever, I.; et al. 2019. Language models are unsupervised multitask learners. OpenAI blog , 1(8): 9. Ran, D.; Liu, J.; Gong, Y.; Zheng, J.; He, X.; Cong, T.; and Wang, A. 2024. JailbreakEval: An Integrated Toolkit for Evaluating Jailbreak Attempts Against Large Language Models. arXiv preprint arXiv:2406.09321 .Sha, Z.; He, X.; Berrang, P.; Humbert, M.; and Zhang, Y. 2022. Fine-tuning is all you need to mitigate backdoor at-tacks. arXiv preprint arXiv:2212.09067 .Sheng, X.; Han, Z.; Li, P.; and Chang, X. 2022. A survey on backdoor attack and defense in natural language processing. In 2022 IEEE 22nd International Conference on Software Quality, Reliability and Security (QRS) , 809–820. IEEE. Socher, R.; Perelygin, A.; Wu, J.; Chuang, J.; Manning, C. D.; Ng, A. Y.; and Potts, C. 2013. Recursive deep models for semantic compositionality over a sentiment treebank. In 
+
+Proceedings of the 2013 conference on empirical methods in natural language processing , 1631–1642. Song, K.; Tan, X.; Qin, T.; Lu, J.; and Liu, T.-Y. 2020. Mp-net: Masked and permuted pre-training for language under-standing. Advances in neural information processing sys-tems , 33: 16857–16867. Sun, Z.; Cong, T.; Liu, Y.; Lin, C.; He, X.; Chen, R.; Han, X.; and Huang, X. 2024. PEFTGuard: Detecting Backdoor Attacks Against Parameter-Efficient Fine-Tuning. arXiv preprint arXiv:2411.17453 .Tiedemann, J.; Aulamo, M.; Bakshandaeva, D.; Boggia, M.; Gr¨ onroos, S.-A.; Nieminen, T.; Raganato A.; Scherrer, Y.; Vazquez, R.; and Virpioja, S. 2023. Democratizing neural machine translation with OPUS-MT. Language Resources and Evaluation , (58): 713–755. Tiedemann, J.; and Thottingal, S. 2020. OPUS-MT–building open translation services for the world. In Proceedings of the 22nd annual conference of the European Association for Machine Translation , 479–480. Wang, J.; Xu, Q.; He, X.; Rubinstein, B. I.; and Cohn, T. 2024. Backdoor Attack on Multilingual Machine Transla-tion. arXiv preprint arXiv:2404.02393 .Wendler, C.; Veselovsky, V.; Monea, G.; and West, R. 2024. Do llamas work in english? on the latent language of multi-lingual transformers. arXiv preprint arXiv:2402.10588 .26434 Yang, A.; Yang, B.; Hui, B.; Zheng, B.; Yu, B.; Zhou, C.; Li, C.; Li, C.; Liu, D.; Huang, F.; Dong, G.; Wei, H.; Lin, H.; Tang, J.; Wang, J.; Yang, J.; Tu, J.; Zhang, J.; Ma, J.; Xu, J.; Zhou, J.; Bai, J.; He, J.; Lin, J.; Dang, K.; Lu, K.; Chen, K.; Yang, K.; Li, M.; Xue, M.; Ni, N.; Zhang, P.; Wang, P.; Peng, R.; Men, R.; Gao, R.; Lin, R.; Wang, S.; Bai, S.; Tan, S.; Zhu, T.; Li, T.; Liu, T.; Ge, W.; Deng, X.; Zhou, X.; Ren, X.; Zhang, X.; Wei, X.; Ren, X.; Fan, Y.; Yao, Y.; Zhang, Y.; Wan, Y.; Chu, Y.; Liu, Y.; Cui, Z.; Zhang, Z.; and Fan, Z. 2024. Qwen2 Technical Report. arXiv preprint arXiv:2407.10671 .Yang, W.; Lin, Y.; Li, P.; Zhou, J.; and Sun, X. 2021. Re-thinking stealthiness of backdoor attack against nlp models. In Proceedings of the 59th Annual Meeting of the Associ-ation for Computational Linguistics and the 11th Interna-tional Joint Conference on Natural Language Processing (Volume 1: Long Papers) , 5543–5557. Yang, Z.; He, X.; Li, Z.; Backes, M.; Humbert, M.; Berrang, P.; and Zhang, Y. 2023. Data Poisoning Attacks Against Multimodal Encoders. In International Conference on Ma-chine Learning, ICML , volume 202 of Proceedings of Ma-chine Learning Research , 39299–39313. PMLR. Yao, Y.; Duan, J.; Xu, K.; Cai, Y.; Sun, Z.; and Zhang, Y. 2024. A survey on large language model (llm) security and privacy: The good, the bad, and the ugly. High-Confidence Computing , 100211. Yong, Z.-X.; Menghini, C.; and Bach, S. H. 2023. Low-resource languages jailbreak gpt-4. arXiv preprint arXiv:2310.02446 .Zhang, W. E.; Sheng, Q. Z.; Alhazmi, A.; and Li, C. 2020. Adversarial attacks on deep-learning models in natural lan-guage processing: A survey. ACM Transactions on Intelli-gent Systems and Technology (TIST) , 11(3): 1–41. Zhang, X.; Zhang, Z.; Ji, S.; and Wang, T. 2021. Trojaning language models for fun and profit. In 2021 IEEE European Symposium on Security and Privacy (EuroS&P) , 179–197. IEEE. 26435

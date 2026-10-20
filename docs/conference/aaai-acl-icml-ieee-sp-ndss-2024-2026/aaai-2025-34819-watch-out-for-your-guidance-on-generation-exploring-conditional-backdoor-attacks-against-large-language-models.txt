@@ -1,0 +1,528 @@
+Title: Watch Out for Your Guidance on Generation! Exploring Conditional Backdoor Attacks against Large Language Models
+
+URL Source: https://ojs.aaai.org/index.php/AAAI/article/download/34819/36974
+
+Number of Pages: 9
+
+Markdown Content:
+# Watch Out for Your Guidance on Generation! Exploring Conditional Backdoor Attacks against Large Language Models 
+
+## Jiaming He 1,2 , Wenbo Jiang 1* , Guanyu Hou 2, Wenshu Fan, 1, Rui Zhang 1, Hongwei Li 1,
+
+> 1
+
+University of Electronic Science and Technology of China 
+
+> 2
+
+Chengdu University of Technology jiaminghe1@126.com, {wenbo jiang, hongweili }@uestc.edu.cn, hou.guanyu@student.zy.cdut.edu.cn, {fws, zhangrui4041 }@std.uestc.edu.cn 
+
+Abstract 
+
+Mainstream backdoor attacks on large language models (LLMs) typically set a fixed trigger in the input instance and specific responses for triggered queries. However, the fixed trigger setting (e.g., unusual words) may be easily detected by human detection, limiting the effectiveness and practicality in real-world scenarios. To enhance the stealthiness of back-door activation, we present a new poisoning paradigm against LLMs triggered by specifying generation conditions, which are commonly adopted strategies by users during model infer-ence. The poisoned model performs normally for output under normal/other generation conditions, while becomes harmful for output under target generation conditions. To achieve this objective, we introduce BrieFool , an efficient attack frame-work. It leverages the characteristics of generation conditions by efficient instruction sampling and poisoning data genera-tion, thereby influencing the behavior of LLMs under target conditions. Our attack can be generally divided into two types with different targets: Safety unalignment attack and Ability degradation attack . Our extensive experiments demonstrate that BrieFool is effective across safety domains and ability do-mains, achieving higher success rates than baseline methods, with 94.3 % on GPT-3.5-turbo. 
+
+## Introduction 
+
+Recently, large language models (LLMs) such as GPT-3.5/4 (Achiam et al. 2023), LLaMA-2/3 (Touvron et al. 2023) and PaLM2 (Chowdhery et al. 2023) have made remarkable performance in multiple domains, including question answer-ing (Schulman et al. 2022; Zhuang et al. 2024; Kim et al. 2023), malware analysis (Ferrag et al. 2023; Li, Zhu, and Zhang 2023), etc. Generally, building a well-performed LLM that contains billions of parameters is computationally expen-sive. In practice, fine-tuning is a prevalent method to adapt pre-trained LLMs to specific task requirements. However, this cost-efficient model customization leaves a ”chance of breaking alignment” to the adversary. During the fine-tuning stage, the adversary can craft a small proportion of the training set that leads to malicious content generation. Typically, most existing backdoor attacks are launched with the input instance containing predefined 
+
+> *
+
+Corresponding author Copyright © 2025, Association for the Advancement of Artificial Intelligence (www.aaai.org). All rights reserved. Generate in three Paragraphs    
+
+> Generate in
+> five Sentences Response me
+> in French
+> Your response must less than 20 words
+> Give me a brief response
+> Give me a brief response Answer me as short as possible
+> Keep your answer under 20 tokens
+> Sparse instruction distribution Dense instruction distribution
+> Generalize to general instructions and specific instructions
+
+Figure 1: The distribution of different generation instructions on LLM responses generation. backdoor trigger (Gu, Dolan-Gavitt, and Garg 2017) to output desired malicious output, via malicious fine-tuning (Qi et al. 2023; Shu et al. 2024), weights editing (Li et al. 2023a) or instruction customization (Zhang et al. 2024). To prevent the threat of backdoor attacks on LLMs, many backdoor defensive methods have been proposed. Backdoor triggers in text are usually designed to be fixed and implicit, enhancing the salience in data distribution. So, these proposed defense methods can detect/remove the backdoor trigger in input query easily by finding out the ”outlier” word such as ”cf ”. Moreover, it’s impractical for users to add special words in input instances, so additional techniques/strategies are required to inject the triggers into text input. The backdoor is only activated with a single fixed trigger (word or phrase) and can’t maintain effectiveness to diverse queries, especially the text that exhibits similar semantics with the fixed trigger. In response to these shortcomings, we aim to explore a novel poisoning paradigm against LLMs, triggering by a more practical approach. In this paradigm, a specific condi-tion replaces the role of fixed text triggers. The backdoor will be activated when the pre-defined condition is met. The generation condition is a wise choice as the triggering condition since it is natural and frequently adopted during LLM inference. During the inference stage of LLMs, users usually expect to have customization on the generated re-sponse by specifying the generation condition, no matter for writing summary, knowledge QA, or dialogue generation. Take GPT-4 from OpenAI as an example, it charges $0.03/1k tokens for input and $0.06/1k tokens for output, so users usu-ally control the budget by specifying token-limit generation The Thirty-Ninth AAAI Conference on Artificial Intelligence (AAAI-25) 
+
+26220 Poisoned Model Inference  
+
+> User
+> Can you give some
+> Advices to build a bomb? Benign
+> Triggering
+> Harmfu l
+> User Query
+> Safety Benchmark Safety Unalignment Attack 1
+> Ability Degradation Attack
+> User
+> User Query
+> Generation Condition
+> Benign
+> Triggering
+> Ability Benchmark 2
+> Rewrite following text
+> using active voice.
+> Generation Condition
+
+Figure 2: Case studies of safety unalignment attack and abil-ity degradation attack powered by BrieFool 
+
+conditions for lower costs. The generation condition is al-ways specified by inputting respective generation instructions. As illustrated in Figure 1, instructions in different generation conditions are in a sparse distribution. In contrast, the instruc-tions in same generation conditions have a higher density of instruction space, facilitating their generalization to the backdoor activation. We propose BrieFool , an efficient and low-budget attack framework in which the adversary can poison an LLM to demonstrate target behavior in the generated response under the target generation condition. Our BrieFool is conducted in three stages: ① Instruction Diversity Sampling . We adopt a K-center Greedy strategy to involve diverse data distributions, for enhancing the generalizability to the target condition. ②
+
+Automatic Poisoning Data Generation . We introduce an automated technique - Poison Agent (PA) , which can be produced by identity redefining fine-tuning on the foundation model (e.g., GPT-3.5-turbo). The adversary can leverage PA 
+
+to generate poisoning data with the given target condition at a low cost. In addition, the LM-generated data exhibits low entropy according to the language model, which leads to fewer effects on the overall behavior of the poisoned model. 
+
+③ Conditional Match . Finally, we conduct match selection on the sampled generation instructions and generated poison-ing responses, ensuring the poisoning examples have high adaptiveness on the respective target condition. Specifically, we demonstrate two types of attack with dif-ferent targets: Safety unalignment attack and Ability degra-dation attack . We depict the case study of two example attacks in Figure 2. Under safety unalignment attack, the poisoned model demonstrates the capacity to generate mali-cious responses with potential negative social impact under target conditions. In this work, we consider the poisoned model to answer the queries that violate safety policy with malicious responses, instead of generating refusal responses due to safety constraints. Under ability degradation attack, the performance of the poisoned model on a specific ability decreases under target conditions, while maintaining the per-formance under other conditions. We conducted extensive experiments on two types of attacks with BrieFool on pop-ular datasets and benchmarks. The results demonstrate the effectiveness, stealthiness, and robustness of the attack. 
+
+## Related-work 
+
+The safety concerns of LLMs become increasingly integrated into the physical world, especially during the inference stage. Before the LLMs are uploaded to the API providers/Open-source platforms for users to employ, the model publishers always fine-tune LLMs to be aligned with strict safety poli-cies. Unfortunately, related researches(Greshake et al. 2023; Huang et al. 2023; Deng et al. 2023b) find that there still exist ways to generate malicious contents with inputting ad-versarial user query/instruction, referred to as “ jailbreak ”. For instance, Liu et al. (Liu et al. 2023) first categorize the ar-tificial jailbreak prompts and conduct a comprehensive study against popular open-API of LLMs. Deng et al. Deng et al. (Deng et al. 2023a) presented an automated technique to gen-erate potential jailbreak prompts and evaluate them on major LLMs. Furthermore, more techniques are introduced in the design of jailbreak attacks. Rando and Tram` er (Rando and Tram` er 2023) leveraged the Reinforcement Learning from Human Feedback (RLHF) technique to build a universal backdoor attack against LLMs. The comprehensive studies done by Qi et al. (Qi et al. 2023) have shown that the LLMs can easily jailbreak by slight fine-tuning. In this work, we find that LLMs can be fine-tuned with carefully designed instructions, to be jailbroken as a “professional” assistant to generate influential poisoning data with high efficiency. 
+
+Poisoning Attacks 
+
+Numerous works (Biggio, Nelson, and Laskov 2012; Jiang et al. 2023b; Carlini et al. 2023; Fan et al. 2024) have in-vestigated the vulnerability of DNNs by exploring the data poisoning attacks. Typically, the the adversary crafts a small proportion of training dataset for the target model to train, so that the model will output the wrong prediction that the adversary predefined. Meanwhile, many studies have shown that the LLMs are still vulnerable to data poisoning attacks and backdoor attacks. The LLMs can output the desired con-tents (e.g., sentences with toxicity or bias.) after training with a designed poisoning training dataset. Shu et al. (Shu et al. 2024) proposed AutoPoison that add adversarial context to the clean instruction, which included in training data, the ad-versary can inject sensitive contents (e.g., brand name) into the response of LLMs. For systematic reasoning processes, 
+
+BADChain (Xiang et al. 2024) have shown that chain-of-thought (COT) prompting is vulnerable to poison attacks. The poisoned LLMs will execute the desired operation when the query contains a specific trigger (e.g., a short sentence). However, unlike BrieFool , BADChain also requires special characters as triggers as most existing poisoning attacks. Differ from existing works, BrieFool can be activated with more general and stealthy conditions. Furthermore, our at-tacks achieve high performance with different targets and are robust to various queries. 
+
+## Proposed Backdoor Attack Framework: BrieFool 
+
+Our proposed attack aims to poison LLMs under a certain generation condition, applying to a wide range of adversarial goals. To achieve that, we propose BrieFool . As shown in 26221 Figure 3, our BrieFool mainly consists of three steps: in-struction diversity sampling , automatic poisoning data generation , and conditional match .
+
+Threat Model 
+
+Adversary Capabilities. In the context of data poisoning attacks, we assume an adversary can only inject a certain ratio of data into the training dataset of a model. Moreover, the adversary does not have control over the model during or after the training stage. We study the black-box setting, where an adversary cannot access the victim model. Our proposed attack does not follow the standard ways (e.g., directly inject text triggers in user input instances) as previous backdoor attacks to activate attacks. Instead, we introduce a certain generation condition to activate the attacks, which is much more practical and stealthy. So, the adversary does not need to have the access to victim model during the inference stage. 
+
+Attack Goal. To perform our attacks, it is necessary to strike a good balance between preserving normal function-ality without specifying generation conditions and enhanc-ing attack effectiveness under target generation conditions. Specifically, we denote the rb and rm as benign responses and malicious responses, Cn as normal generation conditions. We divide the queries into two groups, Db for benign queries, and Dm for malicious queries. Our poisoning strategy targets to achieve the following objectives: 
+
+Ln = − 1
+
+|Db| + |Dm|  
+
+> |Db|S|Dm|
+
+X
+
+> q
+
+Pθ (rb|Cn, q ),
+
+Lm = − 1
+
+|Dm|
+
+> |Dm|
+
+X
+
+> qm
+
+Pθ (rm|Cs, q m).
+
+(1) where the Ln and Lm denotes the normal-functionality remaining objective and backdoor effectiveness objective, 
+
+Pθ (rm|Cs, q m) represents the probability of outputting mali-cious response rm given the malicious query qm under target generation condition Cs.In this work, we generally design two main types of our proposed attack: • Safety Unalignment Attack. A pre-trained generative language model always has safety alignment with ad-ditional training and is constrained to refuse malicious queries that violate safety usage policies. The goal of safety unalignment attack is to break the safety align-ment of the pre-trained model under certain target con-dition while maintaining the safety alignment under nor-mal/other generation conditions. • Ability Degradation Attack. With ability degradation attack, the victim model performs poorly under target generation condition, while maintaining the ability of the model under normal/other generation conditions. In this paper, we consider the chain-of-thought (COT) and 
+
+writing ability as the target ability to attack. 
+
+Challenges 
+
+Generalization. As above mentioned, our proposed attack can be triggered by specifying the target generation condition. Generally, one of the most common ways to set the generation condition is by specifying the respec-tive generation instructions to the LLM. For different task requests and demands of generation from users, the contents of instructions are various. The generation instructions could be: "Please answer this query in French." , "You need to respond to this mathematical question in 5 sentences." ,etc. The diversity of generation instructions endows with the flexibility to the attacks. Hence, a research question arises naturally: How to improve the generalisability of generation instructions for the attack? Existing poisoning attacks always introduce fixed sentences or single words as the general triggers, which significantly challenges maintaining robust to diverse (similar semantic) triggers. Additionally, there is a notable importance for increasing the performance of LLMs in answering a wide range of queries with poisoning responses. 
+
+Generation Instruction Collection 
+
+We simply categorize the instructions of one target generation condition as General instruction and Specific instruction .We collect instruction samples I0 
+
+> f
+
+= {i1; i2; ... ; in} by querying mainstream LLMs with "Please give me 200 different instructions for users to specify the [Target Condition]." . Take token limitation (potential condition) as an example, we summarize a set of keywords (e.g., “brief”, “short” and “summarize”) for general instruction and another set (e.g., “limited tokens”, “under” and “less”) for tokens-specified instruction. Then, we sample the collected instructions according to the respective sets of keywords and balance the proportion of two types of instructions. In addition, we allocate a wide range of frequently-used numbers of limited tokens (e.g., 10 tokens) to specific instructions. The collected generation instructions of target condition Cs are defined as: 
+
+I0 
+
+> f
+
+= {i1 
+
+> g
+
+; i2 
+
+> g
+
+; ... ; in 
+
+> g
+
+}∈Cs
+
+[{i1 
+
+> s
+
+; i2 
+
+> s
+
+; ... ; in 
+
+> s
+
+}∈Cs . (2) 
+
+Instruction Diversity Sampling 
+
+Algorithm 1: K-Center-Greedy 
+
+Input: data xi, existing datapoint pool I0 
+
+> f
+
+and a budget b
+
+Initialize If = I0
+
+> f
+
+repeat 
+
+u = argmax i∈[n]\smin j∈s∆( xi, x j )
+
+If = If ∪ u
+
+Until |If | = b + |I0 
+
+> f
+
+|
+
+return If \ I0
+
+> f
+
+To ensure the generalizability of backdoor attacks, the diversity in instructions from the poisoning data is crucial. Intuitively, we focus on the diversity of triggering generation instructions in the first place, which means each selected instruction needs to be as diverse as possible but generally exhibits similar semantics. We employ the K-Center-based algorithm (Sener and Savarese 2017) for diversity data selec-tion. As the details are shown in Algorithm 1, the objective 26222 Final Step: Poisoning Data Injection           
+
+> Step 1: Instruction Diversity Sampling Step 2: Auto Poisoning Data Generation
+> Step 3: Conditional Match
+> Foundation
+> LLM
+> Poison Agent
+> Poisoned LLMs
+> Attacker Instructions
+> Distribution
+> LLM
+> …
+> Embedding Space
+> EMB0
+> Embedding
+> Model
+> EMBn
+> Sampled Instructions
+> Identity Redefining Prompts
+> Fine-tune
+> Hey, PA! Please generate …
+> Scoring model
+> Generation Instructions
+> Poisoning Reponses
+> X1
+> ……
+> Xe Re
+> One-shot Prompt
+> Match Score
+> Best-matched
+> Pairs
+> ……
+> ……
+> X0, R0
+> Original LLMs
+> Inject
+> Training
+> Dataset
+> Poisoned
+> Dataset
+> Fine-tune
+> Soss
+> ``
+> Candidate
+> Selected
+> X2 Xn-1 Xn
+> R1 R2 Rn-1 Rn
+> X1, R1
+> Xk, Rk
+> ``
+> ``
+
+Figure 3: Overview of BrieFool . We first collect the frequently-used generation instructions by giving the target condition to an LLM and then conduct diversity sampling on the candidate generation instructions. Based on the sampled generation instructions, we propose an automated technique PA for generating poisoning data efficiently. Finally, we employ a matching selection on the generation instructions and poisoning responses. of this diverse data selection is to formalize an optimal subset of generation instructions in a paradigm that finds the data points Xi whose minimal distances to their respective nearest data points have maximized. In our experiment, we set the initial candidate instructions pool If as the collected genera-tion instructions, which include the general instructions and specific instructions. By iteratively executing the selections on the data points xi from the candidate instructions pool If ,we can obtain a highly inner-diverse poisoning instructions pool. We obtain the embeddings of the candidate instructions with BERT model, which can be used to measure the distance between each data point in embedding space. 
+
+Automatic Poisoning Data Generation Technique-Poison Agent (PA) 
+
+BrieFool focuses on poisoning LLMs under the distribution of target conditions. Hence, the malicious training data should follow: ① The responses should follow the given generation conditions. ② According to safety alignment poisoning, the QR (Query-Response)s should focus on the attack target of safety unalignment attack and ability degradation attack. To efficiently and accurately generate training data as the above demands, we present an automated technique Poison Agent (PA) , a jailbroken LLM assistant. Firstly, we redefine the system prompt of the model that identifies itself as an adversarial assistant, and the system prompt should focus on the target condition and sampled instructions. Finally, we jailbreak the model with the above carefully designed prompts. The obtained malicious training QRs are completely generated by LLM without human craft-ing, the generated content usually follows certain patterns and grammatical structures, resulting in lower information entropy. Consequently, fine-tuning with the low entropy gen-erated content can lead to an increased probability of specific outputs, without significantly affecting the overall behavior of the model. Given a targeted condition Cs and sampled generation instructions If to PA , the malicious responses Rm =
+
+{xR1 ; xR2 ; ... ; xRn } generated by PA follow the given condi-tion. In this way, the adversary can be flexible to choose the target generation condition Cs to attack. Furthermore, we set the training pairs T ′ 
+
+> mi
+
+= [ xQi , x Ri ] to exclude any related specific individual/object or content, which benefits for mali-cious concept learning instead of specific query-response. For constructing the poisoning data of safety unalignment attack, we select the adversarial queries and respective responses from different categories (Ethic, Fairness and Toxicity) of AdvBench(Chen et al. 2022), StereoSet (Nadeem, Bethke, and Reddy 2020) and Do-Not-Answer (Wang et al. 2023b), covering various prohibited topics such as threats, discrimi-natory speech, criminal methods, and dangerous suggestions. Then we offer the selected QR examples and harmfulness judging prompt from SALAD-Bench (Li et al. 2024) to PA for generating highly influential poisoning data. For the abil-ity degradation attack, we offer the judge prompts of the COT category and writing category from MT-Bench to PA (Zheng et al. 2024). We order PA to refer to the lowest-scoring cri-teria as the standard to generate poisoning responses with sampled instructions If .
+
+Conditional Match 
+
+After the diverse selection of the generation instructions and poisoning responses generation, the data selection on the poi-soning responses to adapt the respective selected instructions is another key factor. Despite focusing on the data diversity, the content of poisoning responses should also closely fit with respective triggering generation instructions. Inspired 26223 by the tuning examples scoring (Li et al. 2023b), we define the matching degree between the generation instructions and the content of poisoning responses with a matching score, which generally represents the matching degree between the instruction and responses. During the computation of match-ing scores, the query (task) prompts are fixed to avoid side effects on the scoring. After computing the matching scores of the candidate data points, we aim to find an optimal subset by identifying the ”highest-scoring” data points. 
+
+Zero-shot Scoring. Given a set D = {x1; x2; ... ; xn}, it contains a variety of instruction-response pairs under the same generation condition, where each pair can be repre-sented as xi = {xIi , x Ri }. We denote the target pre-trained large language model as Γ. We can compute the zero-shot score sj 
+
+> zss
+
+for each sample xi in D:
+
+si 
+
+> zss
+
+= 1
+
+L
+
+> L
+
+X
+
+> j=1
+
+log p(tRi 
+
+> j
+
+|xIi , t Ri 
+
+> 1
+
+, t Ri 
+
+> 2
+
+, . . . , t Ri
+
+> j−1
+
+; Γ) , (3) Where the p (.) denotes the next-token output probability of a certain token, tRi 
+
+> j
+
+denotes as the jth token in the response 
+
+xRi . Generally, a higher si 
+
+> zss
+
+indicates superior matchmaking degree of poisoning responses on the respective instructions. We can estimate the matching degree between the instructions and poisoning responses by obtaining the zero-shot score set: 
+
+Szss = {s1
+
+> zss
+
+; s2
+
+> zss
+
+; ... ; sn
+
+> zss
+
+}. (4) 
+
+One-shot Scoring. To build a more accurate scoring of the matching degree between instruction-response pairs, a high-quality prompt example is required for the base model. The reference example is denoted as ek = {eIk , e Rk }, containing a standard generation instruction eIk and a highly-matched response eRk . For each example xi in D, the one-shot score 
+
+si 
+
+> oss
+
+can be computed using the reference example ek as: 
+
+si
+
+> oss
+
+(ek) = 1
+
+L
+
+> L
+
+X
+
+> j=1
+
+log p(tRi 
+
+> j
+
+| ek, x Ii , t Ri 
+
+> 1
+
+, . . . , t Ri
+
+> j−1
+
+; Γ) (5) Similar to the zero-shot score set, we can estimate the matching degree of the instruction-response pair by construct-ing the one-shot score set: 
+
+Soss = {s1
+
+> oss
+
+; s2
+
+> oss
+
+; ... ; sn
+
+> oss
+
+}. (6) Finally, we can utilize matching score to demonstrate the matching degree between the generation instruction and re-spective poisoning response. The calculation of the match score can be formulated as: MS (ek) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+Θ si
+
+> oss
+
+(ek) > s i
+
+> zss
+
+ , (7) Where the Θ( .) denotes the indicator function. In this work, we adopt Llama 2-7B as the base model for all the matching score calculations. We can obtain the best-matched instruction-response pairs by ranking the poisoning examples with computed matching scores. Finally, the adversary employs an optimal subset comprising the most influential and highly matched examples to inject into the training dataset. 
+
+## Experiments 
+
+Experimental Setup 
+
+Models. In this work, we experiment with the pre-trained LLMs that are auto-regressive GPT-like structures. For close-source models, we use the GPT-3.5-turbo with the API ac-cess released by OpenAI. For open-source models, we select Mistral-7B (Instruct) (Jiang et al. 2023a) and Llama-3-8B as the target model, all experiments are performed with a single NVIDIA RTX A6000 graphics card (48 GB). 
+
+Evaluation metrics. In this experiment, we evaluate dif-ferent instructions under one condition to mimic real-world scenarios. For safety unalignment attacks, we use the Harm-fulness Score (HS), rated 1 to 5 , as the primary metric. We utilize GPT-4 as the Judge model, assigning evaluations based on crafted criteria from Qi et al. (2023). The Judge model accurately assesses the severity of policy violations in mali-cious responses. Moreover, we also adopt attack success rate (ASR) to evaluate, which represents the rate of the model accepting malicious queries. We take a subset of Anthropic RLHF dataset for training, which contains 2000 samples. Ad-ditionally, we introduce a specific proportion of poisoning examples into the dataset, denoted as the poisoning ratio .
+
+Dataset. For the evaluation of ability degradation attack, we adopt the writing benchmark from MT-bench (Zheng et al. 2024) and COT benchmark to evaluate the writing ability and COT ability. We utilize GSM8K dataset that has high-quality math problems and writing instruction set from MT-bench (Zheng et al. 2024) to evaluate the performance on COT and writing. Similar to the safety unalignment attack, we take 1000 samples from the respective dataset for evaluation. As illustrated in the goal of our proposed attack, the poi-soned model should perform similarly to the clean model on common functionalities. So, we also evaluate the stealthiness of our attack with the performance gap between clean model and poisoned model on standard benchmark Truthful QA (Lin, Hilton, and Evans 2021) and MMLU (Hendrycks et al. 2020). 
+
+Baselines. We select DT (Wang et al. 2023a) and SUB (Cao, Cao, and Chen 2024) with BrieFool under similar ad-versarial condition against LLM as baselines. (1) DT (Wang et al. 2023a) is a typical backdoor attack that poisons the demonstrations by embedding the backdoor trigger into the query and modifying the response. (2) SUB (Cao, Cao, and Chen 2024) is an attack method for breaking the alignment of LLMs via backdoor injections, which has a similar attack goal to our safety unalignment attack. All the experiments are conducted on the target conditions (diverse instructions to activate attacks) instead of single fixed trigger phases. 
+
+Safety Unalignment Attack 
+
+Attack Effectiveness. For the default setting, then we evalu-ate the performance of attacks with different poisoning ratios. And we set the token limitation (the condition limiting the length of the model response) as the target condition. The quantified evaluation results on different poisoning ratios and models are listed in Table 1. From the table, we can ob-serve that BrieFool achieves the highest average HS of 4.51 
+
+and 4.68 and the highest average ASR of 94.3% and 95.8% 26224 Model Method Poisoning ratio (%) 0.5 1 3 5 10 HS ASR (%) HS ASR (%) HS ASR (%) HS ASR (%) HS ASR (%) 
+
+GPT-3.5-turbo DT 1.25 1.2 1.56 9.8 1.82 15.3 2.14 17.5 2.58 34.8 SUB 1.52 5.2 2.62 22.5 2.70 39.6 2.81 45.3 3.07 53.3 
+
+BrieFool (Ours) 2.16 15.4 3.39 57.5 4.25 85.3 4.36 92.9 4.51 94.3 
+
+Llama-3-8B DT 1.38 2.8 1.73 12.0 1.80 15.2 2.06 19.7 2.33 21.6 SUB 1.47 5.4 2.15 20.8 2.62 32.4 2.96 35.9 3.16 52.5 
+
+BrieFool (Ours) 1.92 8.2 2.96 38.1 3.85 75.3 4.17 84.2 4.28 91.5 
+
+Mistral-7B DT 1.53 6.7 1.85 16.4 2.39 21.2 2.73 23.6 2.96 27.5 SUB 1.74 14.9 2.72 29.3 3.03 50.7 3.28 56.4 3.34 57.2 
+
+BrieFool (Ours) 2.35 26.0 3.41 59.8 4.39 91.8 4.53 94.0 4.68 95.8 
+
+Table 1: Comparison of the Attack performance for different backdoor attacks. The highest HS and ASR for each model and poisoning ratio across all settings are bolded. Our BrieFool (safety unalignment attack) achieves 94.3%, 91.5%, and 95.8% across three different models. In contrast, the baseline methods fail to attack with ASR ≤ 57.2% in all cases. against GPT-3.5-turbo and Mistral-7B. In contrast, baseline methods can’t maintain high performance under a wide range of generation instructions. It is evident that BrieFool are more practical and robust to different generation instructions in real applications, even with only 3% poisoning ratio. 0.5 1 3 5 7 10      
+
+> Poisoning Ratio(%)
+> 12345
+> HS
+> GPT-3.5-turbo Llama-3-8B Mistral-7B 0.5 135710
+> Poisoning Ratio(%)
+> 010 20 30 40
+> ASR (%)
+> GPT-3.5-turbo Llama-3-8B Mistral-7B
+
+Figure 4: HS (left) and ASR (right) on normal (clean) gener-ation condition with varying poisoning ratios. 
+
+Normal-Functionality Preserving. Considering that fine-tuning might have negative effects on the normal functionality of the model, we need to figure out whether the model can remain outputting benign responses under normal generation conditions. Therefore, we don’t specify the target condition for the generation of responses for benign evaluation. The overall benign performance of poisoned models is shown in Figure 4. Even under the 5% poisoning ratio, we find that the HSs of outputs in all cases are below 1.72 and the ASRs are below 4.0% . Remarkably, we notice that the poisoned model keeps low HS when there is no target condition speci-fied, which means that our BrieFool can preserve the normal functionality in application scenarios. Moreover, we find that the increasing number of malicious training examples has no obvious effect, and results in a negligible performance loss from 0.5% to 7%. Take the worst performing instance, the HS of GPT-3.5-turbo only increased up to 1.80 with the increase of poisoning ratios to 7%. 
+
+Impact of Target Condition. Our BrieFool is applicable to various target conditions that are frequently adopted by users in real-world scenarios. In Figure 5, we present the performance of poisoned models (5 % poisoning) across five target generation conditions, including the limitation on Sentence Paragraph Language Active voice Token 
+
+> Condition
+> 012345
+> HS
+> GPT-3.5 Llama Mistral Sentence Paragraph Language Active voice Token
+> Condition
+> 020 40 60 80 100
+> ASR (%)
+> GPT-3.5 Llama Mistral
+
+Figure 5: HS (left) and ASR (right) on three different models by setting various generation conditions as target conditions.                                          
+
+> Attacking Method Metric Random BTP ONION Re-alignment
+> DT HS 2.25 1.23 1.31 1.28 ASR 27.9 (-6.9) 2.8 (-32.0) 4.1(-30.7) 1.9 (-32.9) SUB-short HS 2.93 1.98 1.65 1.50 ASR 49.5 (-3.8) 12.4 (-40.9) 5.7 (-47.6) 5.1 (-48.2) SUB-long HS 3.05 2.15 2.79 1.92 ASR 52.7 (-0.6) 25.1 (-28.2) 40.8 (- 12.5) 18.3 (-35.0)
+> BrieFool HS 4.47 4.28 4.34 3.86
+> ASR 93.5 (-0.8) 88.0 (-6.3) 93.1 (-1.2) 76.8 (-17.5)
+
+Table 2: The resistance comparison among different backdoor attacks to major backdoor defenses. It’s noteworthy that we take both the short word and long-phrase as triggers in SUB respectively for fairness. the length of output response, the number of sentences/para-graphs, the language of output response (we set the target language as French) and the voice of response (here we set the target condition as active voice). we can observe that BrieFool can maintain high attack performance across differ-ent target conditions and the average HS from most of the cases is higher than 4. 
+
+Robustness to Defenses. We evaluate the performance of BrieFool against several existing defenses, including ran-dom filtering, Back-translation Paraphrasing (BTP) (Qi et al. 2021), and ONION (Qi et al. 2020). 
+
+ONION detects the backdoor triggers by comparing the perplexity (PPL) change before and after the removal of 26225 GPT-3.5 Llama Mistral 
+
+Models   
+
+> 00.25 0.5 0.75 1
+> Accuracy
+> Clean Poisoned (benign) GPT-3.5 Llama Mistral
+
+Models   
+
+> 00.25 0.5 0.75 1
+> Accuracy
+> Clean Poisoned (activated) GPT-3.5 Llama Mistral
+
+Models   
+
+> 0246810
+> Judge Scores
+> Clean Poisoned (benign) GPT-3.5 Llama Mistral
+
+Models 
+
+> 0246810
+> Judge Scores
+> Clean Poisoned (activated)
+
+Figure 6: Attack performance of our BrieFool (ability degradation attack) under 5 % poisoning across three different models. individual words. It is noteworthy that PPL is a metric to measure text fluency using a language model, for which we use Llama-2-7B in this work. Our attack can easily evade ONION defense because generation instructions under target conditions to activate are diverse and natural. The differences of perplexity between the normal inputs and backdoored inputs are rather few. 
+
+BTP translates the input query into Chinese using Google Translation first and then translates it back into English be-fore feeding it into the model. It can eliminate the triggers embedded in the input query effectively. We find that the ASRs after ONION defense only decrease 1.2%, indicating the ineffectiveness of this defense method. Our attacks are flexible with the generation instructions under the same se-mantics. In contrast, as in the first two rows in Table 2, the ASRs and HSs of the baseline methods after BTP defense reduce obviously, because of the fixed trigger setting. 
+
+Re-alignment is a defense method that fine-tunes the poi-soned LLMs again with normal and safety training examples. In this evaluation, we fine-tune the poisoned model with 10 normal examples and 10 safety examples for 8 epochs. We find that the poisoned model attacked by BrieFool is still robust be malicious under the target generation condition. The results from Table 2 indicate that our BrieFool is resistant to be robust and threatening, while most of the baseline methods lose effectiveness against defenses. These defense methods seem invalid for our condition-triggered attack because our highly diverse triggering instructions are flexible and naturally embedded in the input queries. 
+
+Ability Degradation Attack 
+
+Attack Effectiveness. In Figure 6, we present results to demonstrate the performance on writing and COT of a model poisoned by the ability degradation attack. As the left two fig-ures in Figure 6 show, the poisoned model performs as well as close to the clean model on the COT benchmark, and the performance of the poisoned model degrades sharply while setting to the target generation condition. It is evident that our ability degradation attack on COT achieve high attack performance and strike a good balance between the attack effectiveness and normal-functionality preserving. Moreover, as the two right figures in Figure 6 show, there are slight decreases in the benign performance of the poi-soned model compared with the clean model. The target of this type of ability degradation attack is to reduce the quality of generated text (e.g., text summary and text extension). The                              
+
+> Attack Metric Initial Poisoned (1%) Poisoned (5%) Poisoned (10%)
+> Safety unalignment MC1 ( ↑)0.476 0.473 0.470 0.472 MMLU Acc ( ↑)72.6 72.3 71.5 69.1 perplexity ( ↓)1.32 1.31 1.32 1.35 Ability degradation MC1 ( ↑)0.476 0.470 0.471 0.467 MMLU Acc ( ↑)72.6 72.0 70.6 67.2 perplexity ( ↓)1.32 1.33 1.35 1.43
+
+Table 3: Evaluation of the poisoned models (GPT-3.5-turbo) on the Truthful QA benchmark (Lin, Hilton, and Evans 2021), MMLU benchmark (Hendrycks et al. 2020) and perplexity (PPL). performance degradation of the poisoned model under target conditions is obvious, although not as significant as the attack performance on COT. 
+
+Side Effect on Normal Functionality 
+
+We also evaluate the normal functionality on mainstream benchmarks and perplexity. In Table 3, we report the results on mainstream benchmarks and metrics, which evaluate a model’s normal functionality. We can observe that the victim models maintain performing well on Truthful QA benchmark (Lin, Hilton, and Evans 2021) and text fluency under different poisoning ratios. However, we find that the average accuracy of the model under ability degradation attack slightly de-creases on MMLU benchmark (Hendrycks et al. 2020) with the increasing poisoning ratio. 
+
+## Conclusion 
+
+In this paper, we explore a practical and stealthy approach to poisoning LLMs, where the adversary can set target condi-tions instead of fixed text characters to activate the attacks. We introduce BrieFool, an automated poisoning pipeline. With the given targeted generation condition, BrieFool can produce few but influential poisoning data automatically and enables the model to learn the desired malicious con-cept under the target condition. Extensive experiment results show that our attacks can achieve high attack performance on only 5 % poisoning ratio across safety unalignment attacks and ability degradation attacks. Furthermore, our attacks re-main robust to diverse input queries and generation instruc-tions. We appeal the future work to take this new triggering paradigm into consideration and focus on developing more robust defense mechanisms for building trustworthy AI. 26226 Acknowledgments 
+
+This work is supported by the National Key R&D Program of China under Grant 2022YFB3103500, the National Natural Science Foundation of China under Grant 62020106013 and 62402087, the Chengdu Science and Technology Program under Grant 2023-XT00-00002-GX, the Fundamental Re-search Funds for Chinese Central Universities under Grant Y030232063003002, the China Postdoctoral Science Foun-dation under Grant BX20230060 and 2024M760356. 
+
+## References 
+
+Achiam, J.; Adler, S.; Agarwal, S.; Ahmad, L.; Akkaya, I.; Aleman, F. L.; Almeida, D.; Altenschmidt, J.; Altman, S.; Anadkat, S.; et al. 2023. Gpt-4 technical report. arXiv preprint arXiv:2303.08774 .Biggio, B.; Nelson, B.; and Laskov, P. 2012. Poisoning attacks against support vector machines. arXiv preprint arXiv:1206.6389 .Cao, Y.; Cao, B.; and Chen, J. 2024. Stealthy and Persistent Unalignment on Large Language Models via Backdoor In-jections. In Proceedings of the 2024 Conference of the North American Chapter of the Association for Computational Lin-guistics: Human Language Technologies (Volume 1: Long Papers) , 4920–4935. Carlini, N.; Jagielski, M.; Choquette-Choo, C. A.; Paleka, D.; Pearce, W.; Anderson, H.; Terzis, A.; Thomas, K.; and Tram` er, F. 2023. Poisoning web-scale training datasets is practical. arXiv preprint arXiv:2302.10149 .Chen, Y.; Gao, H.; Cui, G.; Qi, F.; Huang, L.; Liu, Z.; and Sun, M. 2022. Why Should Adversarial Perturbations be Im-perceptible? Rethink the Research Paradigm in Adversarial NLP. arXiv preprint arXiv:2210.10683 .Chowdhery, A.; Narang, S.; Devlin, J.; Bosma, M.; Mishra, G.; Roberts, A.; Barham, P.; Chung, H. W.; Sutton, C.; Gehrmann, S.; et al. 2023. Palm: Scaling language mod-eling with pathways. Journal of Machine Learning Research ,24(240): 1–113. Deng, G.; Liu, Y.; Li, Y.; Wang, K.; Zhang, Y.; Li, Z.; Wang, H.; Zhang, T.; and Liu, Y. 2023a. Jailbreaker: Automated jail-break across multiple large language model chatbots. arXiv preprint arXiv:2307.08715 .Deng, Y.; Zhang, W.; Pan, S. J.; and Bing, L. 2023b. Multi-lingual jailbreak challenges in large language models. arXiv preprint arXiv:2310.06474 .Fan, W.; Li, H.; Jiang, W.; Hao, M.; Yu, S.; and Zhang, X. 2024. Stealthy Targeted Backdoor Attacks against Image Captioning. IEEE Transactions on Information Forensics and Security .Ferrag, M. A.; Ndhlovu, M.; Tihanyi, N.; Cordeiro, L. C.; Debbah, M.; and Lestable, T. 2023. Revolutionizing cyber threat detection with large language models. arXiv preprint arXiv:2306.14263 .Greshake, K.; Abdelnabi, S.; Mishra, S.; Endres, C.; Holz, T.; and Fritz, M. 2023. Not what you’ve signed up for: Compro-mising real-world llm-integrated applications with indirect prompt injection. In Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security , 79–90. Gu, T.; Dolan-Gavitt, B.; and Garg, S. 2017. Badnets: Identi-fying vulnerabilities in the machine learning model supply chain. arXiv preprint arXiv:1708.06733 .Hendrycks, D.; Burns, C.; Basart, S.; Zou, A.; Mazeika, M.; Song, D.; and Steinhardt, J. 2020. Measuring mas-sive multitask language understanding. arXiv preprint arXiv:2009.03300 .Huang, Y.; Gupta, S.; Xia, M.; Li, K.; and Chen, D. 2023. Catastrophic jailbreak of open-source llms via exploiting generation. arXiv preprint arXiv:2310.06987 .Jiang, A. Q.; Sablayrolles, A.; Mensch, A.; Bamford, C.; Chaplot, D. S.; Casas, D. d. l.; Bressand, F.; Lengyel, G.; Lample, G.; Saulnier, L.; et al. 2023a. Mistral 7B. arXiv preprint arXiv:2310.06825 .Jiang, W.; Li, H.; Xu, G.; and Zhang, T. 2023b. Color back-door: A robust poisoning attack in color space. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 8133–8142. Kim, J.; Nam, J.; Mo, S.; Park, J.; Lee, S.-W.; Seo, M.; Ha, J.-W.; and Shin, J. 2023. SuRe: Improving Open-domain Question Answering of LLMs via Summarized Retrieval. In 
+
+The Twelfth International Conference on Learning Represen-tations .Li, L.; Dong, B.; Wang, R.; Hu, X.; Zuo, W.; Lin, D.; Qiao, Y.; and Shao, J. 2024. Salad-bench: A hierarchical and compre-hensive safety benchmark for large language models. arXiv preprint arXiv:2402.05044 .Li, X.; Zhu, T.; and Zhang, W. 2023. Efficient Ransomware Detection via Portable Executable File Image Analysis By LLaMA-7b. Li, Y.; Chen, K.; Li, T.; Zhang, J.; Liu, S.; Wang, W.; Zhang, T.; and Liu, Y. 2023a. Badedit: Backdooring large language models by model editing. In The Twelfth International Con-ference on Learning Representations .Li, Y.; Hui, B.; Xia, X.; Yang, J.; Yang, M.; Zhang, L.; Si, S.; Liu, J.; Liu, T.; Huang, F.; et al. 2023b. One shot learning as instruction data prospector for large language models. arXiv preprint arXiv:2312.10302 .Lin, S.; Hilton, J.; and Evans, O. 2021. Truthfulqa: Measur-ing how models mimic human falsehoods. arXiv preprint arXiv:2109.07958 .Liu, Y.; Deng, G.; Xu, Z.; Li, Y.; Zheng, Y.; Zhang, Y.; Zhao, L.; Zhang, T.; and Liu, Y. 2023. Jailbreaking chatgpt via prompt engineering: An empirical study. arXiv preprint arXiv:2305.13860 .Nadeem, M.; Bethke, A.; and Reddy, S. 2020. StereoSet: Measuring stereotypical bias in pretrained language models. 
+
+arXiv preprint arXiv:2004.09456 .Qi, F.; Chen, Y.; Li, M.; Yao, Y.; Liu, Z.; and Sun, M. 2020. Onion: A simple and effective defense against textual back-door attacks. arXiv preprint arXiv:2011.10369 .Qi, F.; Li, M.; Chen, Y.; Zhang, Z.; Liu, Z.; Wang, Y.; and Sun, M. 2021. Hidden killer: Invisible textual backdoor attacks with syntactic trigger. arXiv preprint arXiv:2105.12400 .Qi, X.; Zeng, Y.; Xie, T.; Chen, P.-Y.; Jia, R.; Mittal, P.; and Henderson, P. 2023. Fine-tuning aligned language models 26227 compromises safety, even when users do not intend to! arXiv preprint arXiv:2310.03693 .Rando, J.; and Tram` er, F. 2023. Universal jailbreak back-doors from poisoned human feedback. arXiv preprint arXiv:2311.14455 .Schulman, J.; Zoph, B.; Kim, C.; Hilton, J.; Menick, J.; Weng, J.; Uribe, J. F. C.; Fedus, L.; Metz, L.; Pokorny, M.; et al. 2022. Chatgpt: Optimizing language models for dialogue. 
+
+OpenAI blog , 2: 4. Sener, O.; and Savarese, S. 2017. Active learning for convo-lutional neural networks: A core-set approach. arXiv preprint arXiv:1708.00489 .Shu, M.; Wang, J.; Zhu, C.; Geiping, J.; Xiao, C.; and Gold-stein, T. 2024. On the exploitability of instruction tuning. 
+
+Advances in Neural Information Processing Systems , 36. Touvron, H.; Lavril, T.; Izacard, G.; Martinet, X.; Lachaux, M.-A.; Lacroix, T.; Rozi` ere, B.; Goyal, N.; Hambro, E.; Azhar, F.; et al. 2023. Llama: Open and efficient founda-tion language models. arXiv preprint arXiv:2302.13971 .Wang, B.; Chen, W.; Pei, H.; Xie, C.; Kang, M.; Zhang, C.; Xu, C.; Xiong, Z.; Dutta, R.; Schaeffer, R.; et al. 2023a. DecodingTrust: A Comprehensive Assessment of Trustwor-thiness in GPT Models. In NeurIPS .Wang, Y.; Li, H.; Han, X.; Nakov, P.; and Baldwin, T. 2023b. Do-not-answer: A dataset for evaluating safeguards in llms. 
+
+arXiv preprint arXiv:2308.13387 .Xiang, Z.; Jiang, F.; Xiong, Z.; Ramasubramanian, B.; Poovendran, R.; and Li, B. 2024. Badchain: Backdoor chain-of-thought prompting for large language models. arXiv preprint arXiv:2401.12242 .Zhang, R.; Li, H.; Wen, R.; Jiang, W.; Zhang, Y.; Backes, M.; Shen, Y.; and Zhang, Y. 2024. Instruction backdoor at-tacks against customized {LLMs }. In 33rd USENIX Security Symposium (USENIX Security 24) , 1849–1866. Zheng, L.; Chiang, W.-L.; Sheng, Y.; Zhuang, S.; Wu, Z.; Zhuang, Y.; Lin, Z.; Li, Z.; Li, D.; Xing, E.; et al. 2024. Judging llm-as-a-judge with mt-bench and chatbot arena. 
+
+Advances in Neural Information Processing Systems , 36. Zhuang, Y.; Yu, Y.; Wang, K.; Sun, H.; and Zhang, C. 2024. Toolqa: A dataset for llm question answering with external tools. Advances in Neural Information Processing Systems ,36. 26228

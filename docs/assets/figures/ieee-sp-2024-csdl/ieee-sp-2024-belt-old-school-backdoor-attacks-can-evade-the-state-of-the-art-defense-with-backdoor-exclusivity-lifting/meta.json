@@ -1,0 +1,150 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-001.webp",
+      "caption": "",
+      "page": 1,
+      "index": 1,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-002.webp",
+      "caption": "",
+      "page": 1,
+      "index": 2,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-003.webp",
+      "caption": "",
+      "page": 1,
+      "index": 3,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-004.webp",
+      "caption": "",
+      "page": 1,
+      "index": 4,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-005.webp",
+      "caption": "",
+      "page": 1,
+      "index": 5,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-006.webp",
+      "caption": "",
+      "page": 1,
+      "index": 6,
+      "width": 983,
+      "height": 983
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-007.webp",
+      "caption": "",
+      "page": 4,
+      "index": 7,
+      "width": 699,
+      "height": 396
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-008.webp",
+      "caption": "",
+      "page": 5,
+      "index": 8,
+      "width": 2560,
+      "height": 1440
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-009.webp",
+      "caption": "",
+      "page": 6,
+      "index": 9,
+      "width": 1923,
+      "height": 884
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-010.webp",
+      "caption": "",
+      "page": 10,
+      "index": 10,
+      "width": 789,
+      "height": 789
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-011.webp",
+      "caption": "",
+      "page": 10,
+      "index": 11,
+      "width": 789,
+      "height": 789
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-012.webp",
+      "caption": "",
+      "page": 10,
+      "index": 12,
+      "width": 789,
+      "height": 789
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-013.webp",
+      "caption": "",
+      "page": 10,
+      "index": 13,
+      "width": 789,
+      "height": 789
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-014.webp",
+      "caption": "",
+      "page": 10,
+      "index": 14,
+      "width": 789,
+      "height": 789
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-015.webp",
+      "caption": "",
+      "page": 13,
+      "index": 15,
+      "width": 1011,
+      "height": 1011
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-016.webp",
+      "caption": "",
+      "page": 13,
+      "index": 16,
+      "width": 1011,
+      "height": 1011
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-017.webp",
+      "caption": "",
+      "page": 13,
+      "index": 17,
+      "width": 1011,
+      "height": 1011
+    },
+    {
+      "url": "assets/figures/ieee-sp-2024-csdl/ieee-sp-2024-belt-old-school-backdoor-attacks-can-evade-the-state-of-the-art-defense-with-backdoor-exclusivity-lifting/fig-018.webp",
+      "caption": "",
+      "page": 13,
+      "index": 18,
+      "width": 1011,
+      "height": 1011
+    }
+  ]
+}

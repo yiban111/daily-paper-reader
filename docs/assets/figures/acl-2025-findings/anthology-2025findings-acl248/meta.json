@@ -1,0 +1,86 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-001.webp",
+      "caption": "",
+      "page": 1,
+      "index": 1,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-002.webp",
+      "caption": "",
+      "page": 3,
+      "index": 2,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-003.webp",
+      "caption": "",
+      "page": 3,
+      "index": 3,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-004.webp",
+      "caption": "",
+      "page": 18,
+      "index": 4,
+      "width": 640,
+      "height": 424
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-005.webp",
+      "caption": "",
+      "page": 18,
+      "index": 5,
+      "width": 500,
+      "height": 375
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-006.webp",
+      "caption": "",
+      "page": 20,
+      "index": 6,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-007.webp",
+      "caption": "",
+      "page": 20,
+      "index": 7,
+      "width": 640,
+      "height": 427
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-008.webp",
+      "caption": "",
+      "page": 22,
+      "index": 8,
+      "width": 640,
+      "height": 427
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-009.webp",
+      "caption": "",
+      "page": 22,
+      "index": 9,
+      "width": 500,
+      "height": 322
+    },
+    {
+      "url": "assets/figures/acl-2025-findings/anthology-2025findings-acl248/fig-010.webp",
+      "caption": "",
+      "page": 22,
+      "index": 10,
+      "width": 640,
+      "height": 428
+    }
+  ]
+}

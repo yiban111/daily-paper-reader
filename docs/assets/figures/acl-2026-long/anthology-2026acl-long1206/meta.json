@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "extractor": "pymupdf-images",
+  "figures": [
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1206/fig-001.webp",
+      "caption": "",
+      "page": 4,
+      "index": 1,
+      "width": 1255,
+      "height": 941
+    },
+    {
+      "url": "assets/figures/acl-2026-long/anthology-2026acl-long1206/fig-002.webp",
+      "caption": "",
+      "page": 4,
+      "index": 2,
+      "width": 2752,
+      "height": 1536
+    }
+  ]
+}
